@@ -1,6 +1,7 @@
 "use client";
 
 import { useSignIn } from "@clerk/nextjs/legacy";
+import Link from "next/link";
 import { useState, type FormEvent } from "react";
 
 import { acceso } from "@/lib/acceso.config";
@@ -15,7 +16,7 @@ export function SignInForm({ devBypass, clerkEnabled }: Props) {
   if (devBypass) return <DevForm />;
   if (clerkEnabled) return <ClerkForm />;
   return (
-    <Card kicker="Configuración" title="Falta Clerk o el bypass">
+    <Card title="Falta Clerk o el bypass">
       <p className="text-sm text-muted">
         En <code>.env.local</code> define <code>APP_DEV_BYPASS=true</code> y <code>DEV_SESSION_SECRET</code>, o las keys
         de Clerk.
@@ -24,13 +25,18 @@ export function SignInForm({ devBypass, clerkEnabled }: Props) {
   );
 }
 
-function Card({ kicker, title, children }: { kicker: string; title: string; children: React.ReactNode }) {
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <main className="grid min-h-full place-items-center px-6 py-16">
       <div className="w-full max-w-md rounded-3xl border border-line bg-card p-8 shadow-sm">
-        <p className="text-xs font-bold tracking-[0.14em] text-muted uppercase">{kicker}</p>
-        <h1 className="mt-2 font-serif text-4xl text-foreground">{title}</h1>
+        <h1 className="font-serif text-4xl text-foreground">{title}</h1>
         <div className="mt-6">{children}</div>
+        <Link
+          href="/"
+          className="mt-3 block w-full rounded-2xl border border-line bg-background px-4 py-3 text-center font-bold"
+        >
+          Volver al inicio
+        </Link>
       </div>
     </main>
   );
@@ -93,7 +99,7 @@ function DevForm() {
   }
 
   return (
-    <Card kicker="Acceso" title={`Entrar a ${acceso.producto}`}>
+    <Card title={`Entrar a ${acceso.producto}`}>
       <p className="mb-4 rounded-2xl bg-amber-50 px-3 py-2 text-sm text-amber-900">Modo desarrollo: sin código ni Clerk.</p>
       <form onSubmit={onSubmit} className="space-y-4">
         <Field label="Correo" type="email" value={email} onChange={setEmail} autoComplete="email" />
@@ -173,7 +179,7 @@ function ClerkForm() {
   }
 
   return (
-    <Card kicker="Acceso" title={`Entrar a ${acceso.producto}`}>
+    <Card title={`Entrar a ${acceso.producto}`}>
       <form onSubmit={step === "email" ? sendCode : verifyCode} className="space-y-4">
         {step === "email" ? (
           <Field label="Correo" type="email" value={email} onChange={setEmail} autoComplete="email" />

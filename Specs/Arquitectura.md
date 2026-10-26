@@ -29,8 +29,8 @@ La puerta del niño no viene de un arquetipo. El PIN no sirve para un adulto, y 
 
 | Persona | Cómo entra | Qué hace |
 | --- | --- | --- |
-| Superusuario | Clerk. Lo nombra `SUPER_ADMIN_EMAIL` | Crea la familia y a su banquero |
-| Banquero | Clerk. Uno por familia | Guarda la plata, toca los parámetros, crea niños, auditores y Tips, entrega la plata y también puede aprobar un Tip |
+| Superusuario | Clerk. Lo nombra `SUPER_ADMIN_EMAIL` | Al entrar ve su correo y las familias. Crea cada familia y a su banquero, y puede crear la suya. Si también es banquero, entra a ese rol en otra pantalla |
+| Banquero | Clerk. Uno por familia | Le pone el nombre a su familia, guarda la plata y toca los parámetros. En el mismo panel marca los Tips, les pone el precio, edita el nombre, elimina una tarea o agrega otra. Crea niños y auditores, entrega la plata y también puede aprobar un Tip |
 | Auditor | Clerk. Lo crea el banquero | Dice si la tarea quedó bien |
 | Niño | Identificador + PIN | Marca «¡Listo!», mueve entre Uchas y pide plata |
 

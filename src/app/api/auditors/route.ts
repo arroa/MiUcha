@@ -9,12 +9,12 @@ export async function POST(request: Request) {
 
   const json = (await request.json().catch(() => null)) as { name?: string; email?: string } | null;
   try {
-    await createAuditorAccount({
+    const auditor = await createAuditorAccount({
       familyId: session.familyId,
       name: json?.name ?? "",
       email: json?.email ?? "",
     });
-    return NextResponse.json({ ok: true }, { status: 201 });
+    return NextResponse.json({ ok: true, auditor }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
   }

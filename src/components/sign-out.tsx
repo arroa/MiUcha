@@ -17,7 +17,7 @@ function DevSignOut({ href, endpoint }: { href: string; endpoint: string }) {
   return (
     <button
       type="button"
-      className="text-sm underline"
+      className="shrink-0 rounded-2xl bg-foreground px-5 py-3 text-sm font-bold text-background"
       onClick={async () => {
         await fetch(endpoint, { method: "POST" });
         router.push(href);
@@ -32,7 +32,7 @@ function DevSignOut({ href, endpoint }: { href: string; endpoint: string }) {
 function ClerkSignOut() {
   const { signOut } = useClerk();
   return (
-    <button type="button" className="text-sm underline" onClick={() => signOut({ redirectUrl: "/sign-in" })}>
+    <button type="button" className="shrink-0 rounded-2xl bg-foreground px-5 py-3 text-sm font-bold text-background" onClick={() => signOut({ redirectUrl: "/sign-in" })}>
       Salir
     </button>
   );

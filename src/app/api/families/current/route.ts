@@ -47,6 +47,7 @@ export async function PATCH(request: Request) {
   if (!session?.familyId) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   const json = (await request.json().catch(() => null)) as {
+    name?: string;
     pctInversion?: number;
     pctGasto?: number;
     pctDonaciones?: number;
@@ -56,6 +57,7 @@ export async function PATCH(request: Request) {
   try {
     await updateFamilyParameters({
       familyId: session.familyId,
+      name: json?.name ?? "",
       pctInversion: Number(json?.pctInversion),
       pctGasto: Number(json?.pctGasto),
       pctDonaciones: Number(json?.pctDonaciones),

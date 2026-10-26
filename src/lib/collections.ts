@@ -1,5 +1,6 @@
 import type { Collection, ObjectId } from "mongodb";
 
+import { familyNameKey } from "@/lib/family-name";
 import { getDb } from "@/lib/mongodb";
 
 export type WalletType = "inversion" | "gasto" | "donaciones";
@@ -7,6 +8,9 @@ export type WalletType = "inversion" | "gasto" | "donaciones";
 export type Family = {
   _id: ObjectId;
   name: string;
+  nameKey: string;
+  loginAttempts: number;
+  loginLockedUntil: Date | null;
   banqueroId: ObjectId;
   pctInversion: number;
   pctGasto: number;
@@ -53,16 +57,61 @@ export type Wallet = {
   updatedAt: Date;
 };
 
+export type TipFrequency = "once" | "daily" | "weekly";
+
+export type TipDefinition = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  catalogKey?: string;
+  title: string;
+  description: string;
+  amountMinor: number;
+  frequency: TipFrequency;
+  daysOfWeek: number[];
+  assignedChildIds: ObjectId[];
+  active: boolean;
+  hidden?: boolean;
+  startsOn: string | null;
+  createdAt: Date;
+};
+
 let indexesReady: Promise<void> | null = null;
+
+async function dropIndexIfPresent(collection: Collection, name: string) {
+  const indexes = await collection.indexes();
+  if (indexes.some((index) => index.name === name)) await collection.dropIndex(name);
+}
+
+async function backfillFamilyNameKeys(collection: Collection<Family>) {
+  const pending = await collection.find({ nameKey: { $exists: false } }).toArray();
+  await Promise.all(
+    pending.map((family) =>
+      collection.updateOne(
+        { _id: family._id },
+        { $set: { nameKey: familyNameKey(family.name ?? ""), loginAttempts: family.loginAttempts ?? 0, loginLockedUntil: family.loginLockedUntil ?? null } },
+      ),
+    ),
+  );
+}
 
 async function createIndexes() {
   const db = await getDb();
+  const familyCollection = db.collection<Family>("families");
+  const childCollection = db.collection("children");
+  await backfillFamilyNameKeys(familyCollection);
+  await dropIndexIfPresent(childCollection, "loginId_1");
   await Promise.all([
     db.collection("adults").createIndex({ email: 1, familyId: 1 }, { unique: true }),
     db.collection("adults").createIndex({ clerkUserId: 1 }),
-    db.collection("children").createIndex({ loginId: 1 }, { unique: true }),
-    db.collection("children").createIndex({ familyId: 1 }),
+    familyCollection.createIndex({ nameKey: 1 }, { unique: true, partialFilterExpression: { nameKey: { $gt: "" } } }),
+    childCollection.createIndex({ familyId: 1, loginId: 1 }, { unique: true }),
+    childCollection.createIndex({ familyId: 1 }),
     db.collection("wallets").createIndex({ familyId: 1, childId: 1, type: 1 }, { unique: true }),
+    db.collection("tip_definitions").createIndex({ familyId: 1, active: 1 }),
+    db.collection("tip_definitions").createIndex(
+      { familyId: 1, catalogKey: 1 },
+      { unique: true, partialFilterExpression: { catalogKey: { $type: "string" } } },
+    ),
   ]);
 }
 
@@ -89,4 +138,9 @@ export async function children(): Promise<Collection<Child>> {
 export async function wallets(): Promise<Collection<Wallet>> {
   await ensureIndexes();
   return (await getDb()).collection<Wallet>("wallets");
+}
+
+export async function tipDefinitions(): Promise<Collection<TipDefinition>> {
+  await ensureIndexes();
+  return (await getDb()).collection<TipDefinition>("tip_definitions");
 }

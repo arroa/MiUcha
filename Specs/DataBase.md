@@ -23,11 +23,11 @@ erDiagram
 
 ## families
 
-La crea el superusuario.
+La crea el superusuario, junto con su banquero. El nombre lo pone el banquero; queda vacío hasta entonces.
 
 | Campo | Significado |
 | --- | --- |
-| `name` | Nombre de la familia |
+| `name` | Nombre que le pone el banquero |
 | `banqueroId` | Adulto que guarda la plata |
 | `pctInversion` | Porcentaje de Inversión. Con los otros dos suma 100 |
 | `pctGasto` | Porcentaje de Gasto |
@@ -88,11 +88,12 @@ Tres por niño. Los tipos son fijos: `inversion`, `gasto`, `donaciones`.
 
 ## tip_definitions
 
-El catálogo lo arma el banquero. No es un parámetro de la familia.
+La lista parte con tareas de la casa. El banquero marca cuáles usan, les pone el precio, puede cambiar el nombre, eliminar una y agregar otra. Otra familia no la ve.
 
 | Campo | Significado |
 | --- | --- |
 | `familyId` | Familia |
+| `catalogKey` | Tarea fija, por ejemplo `hacer-la-cama` |
 | `title` | Nombre de la tarea |
 | `description` | Texto opcional |
 | `amountMinor` | Valor en pesos, mayor que cero |

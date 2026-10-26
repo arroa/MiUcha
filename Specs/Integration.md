@@ -54,7 +54,7 @@ El cron no aprueba tareas ni entrega plata.
 | Operación | Método y ruta | Quién | Qué entra | Qué sale |
 | --- | --- | --- | --- | --- |
 | Entrar, adulto | `POST /api/auth/dev-login` | Solo local, con el bypass del arquetipo acceso | Correo | Cookie de desarrollo |
-| Entrar, niño | `POST /api/child-auth/login` | Niño | `loginId`, PIN | Cookie de sesión |
+| Entrar, niño | `POST /api/child-auth/login` | Niño | Nombre de la familia y PIN | Cookie de sesión |
 | Salir, niño | `POST /api/child-auth/logout` | Niño | La cookie | Sesión revocada |
 | Quién soy | `GET /api/me` | Cualquier sesión | — | Persona, familia y rol |
 
@@ -64,13 +64,16 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 
 | Operación | Método y ruta | Quién | Qué entra | Qué sale |
 | --- | --- | --- | --- | --- |
-| Crear familia | `POST /api/families` | Superusuario | Nombre, nombre y correo del banquero | Familia y banquero creado en Clerk |
+| Crear familia | `POST /api/families` | Superusuario | Nombre y correo del banquero. Con `mine`, el banquero es el propio superusuario | Familia y banquero creado en Clerk |
+| Renombrar en la tarjeta | `PATCH /api/families/:id` | Superusuario | Nombre de la familia, único, y nombre del banquero | Esos dos nombres |
 | Ver parámetros | `GET /api/families/current` | Banquero | — | Nombre, porcentajes, tasa, niños y auditores |
-| Guardar parámetros | `PATCH /api/families/current` | Banquero | Porcentajes y `interestPercent` | Los tres porcentajes, si suman 100 |
-| Crear niño | `POST /api/children` | Banquero | Nombre, niño o niña, nacimiento, `loginId`, PIN | Niño y tres Uchas en cero |
-| Desactivar niño | `PATCH /api/children/:id` | Banquero | `active` | El niño ya no entra. El libro sigue |
+| Guardar parámetros | `PATCH /api/families/current` | Banquero | Nombre único, porcentajes y `interestPercent` | El nombre y los tres porcentajes, si suman 100 |
+| Crear niño | `POST /api/children` | Banquero | Nombre, niño o niña, nacimiento, nombre en la casa, PIN | Niño y tres Uchas en cero |
+| Modificar niño | `PATCH /api/children/:id` | Banquero | Nombre, niño o niña, nacimiento, nombre en la casa y PIN si cambia | El niño |
+| Dar de baja niño | `PATCH /api/children/:id` | Banquero | `active: false` | El niño ya no entra. El libro sigue |
 | Restablecer PIN | `POST /api/children/:id/pin` | Banquero | PIN nuevo | PIN reemplazado |
 | Crear auditor | `POST /api/auditors` | Banquero | Nombre y correo | Auditor creado en Clerk |
+| Modificar auditor | `PATCH /api/auditors/:id` | Banquero | Nombre y correo | El auditor |
 | Dar de baja auditor | `DELETE /api/auditors/:id` | Banquero | — | Baja en la familia y en Clerk |
 
 ### Tips
@@ -78,7 +81,9 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | Operación | Método y ruta | Quién | Qué entra | Qué sale |
 | --- | --- | --- | --- | --- |
 | Listar catálogo | `GET /api/tips` | Banquero, o el niño ve los suyos | — | Definiciones |
-| Crear Tip | `POST /api/tips` | Banquero | Título, valor, frecuencia, niños | Definición |
+| Guardar la lista | `PUT /api/tips` | Banquero | Nombre, precio y si está marcada | Las tareas de esa familia |
+| Agregar tarea | `POST /api/tips` con `custom` | Banquero | Nombre y precio | La tarea nueva |
+| Eliminar tarea | `POST /api/tips/dismiss` | Banquero | Clave de la tarea | Ya no aparece en esa familia |
 | Editar o desactivar | `PATCH /api/tips/:id` | Banquero | Campos del catálogo | Definición. No cambia ocurrencias ya creadas |
 | Mis ocurrencias | `GET /api/tip-occurrences` | Niño, banquero o auditor | — | Las de su alcance |
 | Marcar «¡Listo!» | `POST /api/tip-occurrences/:id/submit` | Niño | — | Estado `submitted` |
