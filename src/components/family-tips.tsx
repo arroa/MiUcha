@@ -41,45 +41,60 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState<Row | null>(null);
 
   useEffect(() => {
     if (mode === "preview") setPicked(null);
   }, [mode]);
 
+  useEffect(() => {
+    if (!confirming || busy) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setConfirming(null);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirming, busy]);
+
   function update(key: string, patch: Partial<Row>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
   }
 
-  async function save(nextRows: Row[]) {
-    const res = await fetch("/api/tips", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        items: nextRows.map((row) => ({
-          key: row.key,
-          title: row.title,
-          amountMinor: Number(row.amount),
-          active: row.active,
-        })),
-      }),
-    });
-    const data = (await res.json().catch(() => null)) as { error?: string; tips?: TipView[] } | null;
-    if (!res.ok || !data?.tips) {
-      setError(data?.error ?? "No se pudieron guardar los Tips.");
-      return false;
-    }
-    setRows(rowsFromTips(data.tips).map((row) => ({ ...row, editing: false })));
-    setMessage("Tips guardados.");
-    return true;
+  function edit(key: string) {
+    setError("");
+    setMessage("");
+    setRows((current) => current.map((row) => ({ ...row, editing: row.key === key })));
   }
 
-  async function onSubmit(event: FormEvent) {
-    event.preventDefault();
+  async function finish(row: Row) {
+    const title = row.title.trim();
+    const amount = Number(row.amount);
+    if (!title || title.length > 80) {
+      setError("La tarea necesita un nombre de hasta 80 caracteres.");
+      return;
+    }
+    if (!Number.isInteger(amount) || amount <= 0) {
+      setError(`Ponle un precio en pesos a ${title}.`);
+      return;
+    }
     setBusy(true);
     setError("");
     setMessage("");
     try {
-      await save(rows);
+      const res = await fetch("/api/tips", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{ key: row.key, title, amountMinor: amount, active: row.active }],
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string; tips?: TipView[] } | null;
+      if (!res.ok || !data?.tips) {
+        setError(data?.error ?? "No se pudo guardar la tarea.");
+        return;
+      }
+      setRows(rowsFromTips(data.tips));
+      setMessage("Tarea guardada.");
     } finally {
       setBusy(false);
     }
@@ -90,19 +105,27 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
     setMessage("");
     if (row.key.startsWith("new-")) {
       setRows((current) => current.filter((item) => item.key !== row.key));
+      setConfirming(null);
       return;
     }
-    const res = await fetch("/api/tips/dismiss", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: row.key }),
-    });
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
-    if (!res.ok) {
-      setError(data?.error ?? "No se pudo eliminar la tarea.");
-      return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/tips/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: row.key }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setError(data?.error ?? "No se pudo eliminar la tarea.");
+        return;
+      }
+      setRows((current) => current.filter((item) => item.key !== row.key));
+      setConfirming(null);
+      setMessage("Tarea eliminada.");
+    } finally {
+      setBusy(false);
     }
-    setRows((current) => current.filter((item) => item.key !== row.key));
   }
 
   async function addTask(event: FormEvent) {
@@ -173,89 +196,126 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
           Cerrar
         </button>
       </div>
-      <p className="mt-1 text-sm text-muted">Toca una tarjeta para verla en grande. {activeCount === 1 ? "1 activa" : `${activeCount} activas`}.</p>
+      <p className="mt-1 text-sm text-muted">{activeCount === 1 ? "1 activa" : `${activeCount} activas`}.</p>
+      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+      {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
       <ul className="mt-4 grid grid-cols-2 gap-2">
-        <li className="col-span-2">
+        <li>
           {picked === "new" ? (
-            <form onSubmit={addTask} className="grid gap-3 rounded-2xl border border-accent bg-white p-4">
+            <form onSubmit={addTask} className="grid gap-3 rounded-2xl border border-accent bg-white p-3">
               <div className="flex items-baseline justify-between gap-3">
-                <p className="font-serif text-2xl">Nueva tarea</p>
+                <p className="font-serif text-xl">Nueva tarea</p>
                 <button type="button" onClick={() => setPicked(null)} className="text-sm font-bold text-muted">
                   Cerrar
                 </button>
               </div>
               <label className="text-sm">
                 Nombre
-                <input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3" />
+                <input value={draftTitle} onChange={(event) => setDraftTitle(event.target.value)} className="mt-1.5 w-full rounded-xl border border-line bg-white px-3 py-2" />
               </label>
               <label className="text-sm">
-                Precio
-                <span className="mt-1.5 flex items-center rounded-2xl border border-line bg-white px-3">
+                Valor
+                <span className="mt-1.5 flex items-center rounded-xl border border-line bg-white px-3">
                   <span className="text-muted">$</span>
                   <input type="number" min={1} value={draftAmount} onChange={(event) => setDraftAmount(event.target.value)} className="w-full bg-transparent px-2 py-2 outline-none" />
                 </span>
               </label>
-              <button disabled={busy} className="rounded-2xl border border-accent px-4 py-3 font-bold text-accent disabled:opacity-50">
+              <button disabled={busy} className="rounded-xl border border-accent px-3 py-2 font-bold text-accent disabled:opacity-50">
                 Agregar tarea
               </button>
             </form>
           ) : (
-            <button type="button" onClick={() => setPicked("new")} className="w-full rounded-2xl border border-dashed border-accent/50 bg-white px-3 py-3 text-left hover:border-accent">
+            <button type="button" onClick={() => setPicked("new")} className="h-full w-full rounded-2xl border border-dashed border-accent/50 bg-white px-3 py-3 text-left hover:border-accent">
               <span className="block text-xs text-muted">Sumar</span>
               <span className="block font-serif text-xl">Nueva tarea</span>
             </button>
           )}
         </li>
         {rows.map((row) => (
-          <li key={row.key} className={picked === row.key ? "col-span-2" : ""}>
-            {picked === row.key ? (
-              <div className={`grid gap-3 rounded-2xl border p-4 ${row.active ? "border-accent bg-accent/10" : "border-accent bg-white"}`}>
-                <div className="flex justify-end">
-                  <button type="button" onClick={() => setPicked(null)} className="text-sm font-bold text-muted">
-                    Cerrar
-                  </button>
-                </div>
-                <label className="flex items-center gap-3">
-                  <input type="checkbox" checked={row.active} onChange={(event) => update(row.key, { active: event.target.checked })} className="size-5 accent-accent" />
-                  {row.editing ? (
-                    <input value={row.title} onChange={(event) => update(row.key, { title: event.target.value })} className="w-full rounded-xl border border-line bg-white px-3 py-2 font-bold" />
-                  ) : (
-                    <span className="font-bold">{row.title}</span>
-                  )}
+          <li key={row.key}>
+            <article className={`rounded-2xl border p-2.5 ${row.active ? "border-accent bg-accent/10" : "border-line bg-white"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <label className="flex items-center gap-2 text-sm font-bold">
+                  <input
+                    type="checkbox"
+                    checked={row.active}
+                    disabled={!row.editing}
+                    onChange={(event) => update(row.key, { active: event.target.checked })}
+                    className="size-5 accent-accent disabled:opacity-100"
+                  />
+                  Activa
                 </label>
-                <span className="text-sm">
-                  Precio
-                  <span className="mt-1.5 flex items-center rounded-2xl border border-line bg-white px-3">
-                    <span className="text-muted">$</span>
-                    <input type="number" min={1} value={row.amount} onChange={(event) => update(row.key, { amount: event.target.value })} className="w-full bg-transparent px-2 py-2 outline-none" />
-                  </span>
-                </span>
-                <span className="flex gap-2">
-                  <button type="button" className="rounded-xl border border-foreground/20 px-3 py-2 text-sm font-bold" onClick={() => update(row.key, { editing: !row.editing })}>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => (row.editing ? finish(row) : edit(row.key))}
+                    className="rounded-xl border border-foreground/20 bg-white px-2.5 py-1 text-sm font-bold disabled:opacity-50"
+                  >
                     {row.editing ? "Listo" : "Editar"}
                   </button>
-                  <button type="button" className="rounded-xl border border-red-800/30 px-3 py-2 text-sm font-bold text-red-800" onClick={() => remove(row)}>
+                  <button type="button" disabled={busy} className="rounded-xl px-2.5 py-1 text-sm font-bold text-red-800 disabled:opacity-50" onClick={() => setConfirming(row)}>
                     Eliminar
                   </button>
-                </span>
+                </div>
               </div>
-            ) : (
-              <button type="button" onClick={() => setPicked(row.key)} className={`w-full rounded-2xl border px-3 py-3 text-left hover:border-accent ${row.active ? "border-accent bg-accent/10" : "border-line bg-white"}`}>
-                <span className="block truncate text-xs text-muted">{row.active ? "Activa" : "Precio"}</span>
-                <span className="block truncate font-serif text-xl">{row.title}</span>
-                <span className="text-sm text-muted">${Number(row.amount || 0).toLocaleString("es-CL")}</span>
-              </button>
-            )}
+              <div className="mt-2 flex items-start justify-between gap-3">
+                {row.editing ? (
+                  <input
+                    value={row.title}
+                    onChange={(event) => update(row.key, { title: event.target.value })}
+                    className="min-w-0 flex-1 rounded-xl border border-line bg-white px-3 py-1.5 font-bold"
+                  />
+                ) : (
+                  <p className="min-w-0 font-serif text-lg leading-tight">{row.title}</p>
+                )}
+                <div className="shrink-0 text-right">
+                  <p className="text-xs font-bold text-muted">Valor</p>
+                  {row.editing ? (
+                    <span className="mt-1 flex w-24 items-center rounded-xl border border-line bg-white px-2">
+                      <span className="text-muted">$</span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={row.amount}
+                        onChange={(event) => update(row.key, { amount: event.target.value })}
+                        className="w-full bg-transparent px-1 py-1 text-right outline-none"
+                      />
+                    </span>
+                  ) : (
+                    <p className="text-sm font-bold">${Number(row.amount || 0).toLocaleString("es-CL")}</p>
+                  )}
+                </div>
+              </div>
+            </article>
           </li>
         ))}
       </ul>
-      <form onSubmit={onSubmit} className="mt-4">
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        {message ? <p className="text-sm text-accent">{message}</p> : null}
-        <button disabled={busy} className="mt-3 w-full rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
-          {busy ? "Guardando…" : "Guardar Tips"}
-        </button>
-      </form>
+      {confirming ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) setConfirming(null); }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eliminar-tarea"
+            className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="eliminar-tarea" className="font-serif text-3xl">
+              ¿Eliminar {confirming.title}?
+            </h2>
+            <p className="mt-3">Deja de aparecer en la lista.</p>
+            {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button type="button" disabled={busy} onClick={() => remove(confirming)} className="rounded-2xl bg-red-800 px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Eliminando…" : "Eliminar"}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirming(null)} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

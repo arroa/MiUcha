@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { FamilyTips } from "@/components/family-tips";
-import { PinHelp } from "@/components/pin-help";
+import { PinField } from "@/components/pin-help";
+import { isPin } from "@/lib/pin-rules";
 import type { TipView } from "@/lib/tips";
 
 type FamilyListItem = { id: string; name: string; banqueroName: string; banqueroEmail: string };
@@ -491,6 +492,7 @@ function NewChild({ onCreated, onCancel }: { onCreated: (child: ChildItem) => vo
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!isPin(pin)) return;
     setError("");
     const res = await fetch("/api/children", {
       method: "POST",
@@ -528,12 +530,11 @@ function NewChild({ onCreated, onCancel }: { onCreated: (child: ChildItem) => vo
         </label>
         <Input label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} />
         <Input label="Nombre en la casa" value={loginId} onChange={setLoginId} />
-        <div>
-          <Input label="PIN de 6 números" value={pin} onChange={setPin} />
-          <PinHelp />
-        </div>
+        <PinField label="PIN de 6 números" value={pin} onChange={setPin} />
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button className="rounded-2xl bg-accent px-4 py-3 font-bold text-white">Crear niño</button>
+        <button disabled={!isPin(pin)} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+          Crear niño
+        </button>
       </form>
     </div>
   );
@@ -718,7 +719,10 @@ function ChildCard({
     setMode("view");
   }
 
+  const pinChangeOk = pin.length === 0 || isPin(pin);
+
   async function save() {
+    if (!pinChangeOk) return;
     setBusy(true);
     setError("");
     try {
@@ -780,10 +784,7 @@ function ChildCard({
           </label>
           <Input label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} />
           <Input label="Nombre en la casa" value={loginId} onChange={setLoginId} />
-          <div>
-            <Input label="PIN nuevo, si lo cambias" value={pin} onChange={setPin} />
-            <PinHelp />
-          </div>
+          <PinField label="PIN nuevo, si lo cambias" value={pin} onChange={setPin} />
         </div>
       ) : (
         <>
@@ -800,7 +801,7 @@ function ChildCard({
       <div className="mt-4 grid grid-cols-2 gap-2">
         {mode === "edit" ? (
           <>
-            <button type="button" disabled={busy} onClick={save} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+            <button type="button" disabled={busy || !pinChangeOk} onClick={save} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
               {busy ? "Guardando…" : "Guardar"}
             </button>
             <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">

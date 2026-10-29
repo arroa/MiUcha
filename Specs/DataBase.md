@@ -95,7 +95,6 @@ La lista parte con tareas de la casa. El banquero marca cuáles usan, les pone e
 | `familyId` | Familia |
 | `catalogKey` | Tarea fija, por ejemplo `hacer-la-cama` |
 | `title` | Nombre de la tarea |
-| `description` | Texto opcional |
 | `amountMinor` | Valor en pesos, mayor que cero |
 | `frequency` | `once`, `daily` o `weekly` |
 | `daysOfWeek` | Días, cuando es semanal |

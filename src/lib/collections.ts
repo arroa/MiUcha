@@ -59,12 +59,44 @@ export type Wallet = {
 
 export type TipFrequency = "once" | "daily" | "weekly";
 
+export type TipOccurrenceStatus = "available" | "submitted" | "needs_improvement" | "approved" | "rejected";
+
+export type TipOccurrence = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  definitionId: ObjectId;
+  occurrenceDate: string;
+  title: string;
+  amountMinor: number;
+  status: TipOccurrenceStatus;
+  submittedAt: Date | null;
+  reviewedAt: Date | null;
+  reviewerId: ObjectId | null;
+  reviewNote: string;
+  newsReadAt?: Date | null;
+  newsDismissedAt?: Date | null;
+};
+
+export type LedgerKind = "tip" | "transfer" | "withdrawal" | "interest" | "reversal";
+
+export type LedgerEntry = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  walletType: WalletType;
+  amountMinor: number;
+  kind: LedgerKind;
+  operationId: string;
+  actorId: string;
+  createdAt: Date;
+};
+
 export type TipDefinition = {
   _id: ObjectId;
   familyId: ObjectId;
   catalogKey?: string;
   title: string;
-  description: string;
   amountMinor: number;
   frequency: TipFrequency;
   daysOfWeek: number[];
@@ -112,6 +144,11 @@ async function createIndexes() {
       { familyId: 1, catalogKey: 1 },
       { unique: true, partialFilterExpression: { catalogKey: { $type: "string" } } },
     ),
+    db.collection("tip_occurrences").createIndex(
+      { familyId: 1, childId: 1, definitionId: 1, occurrenceDate: 1 },
+      { unique: true },
+    ),
+    db.collection("ledger_entries").createIndex({ operationId: 1, walletType: 1 }, { unique: true }),
   ]);
 }
 
@@ -143,4 +180,14 @@ export async function wallets(): Promise<Collection<Wallet>> {
 export async function tipDefinitions(): Promise<Collection<TipDefinition>> {
   await ensureIndexes();
   return (await getDb()).collection<TipDefinition>("tip_definitions");
+}
+
+export async function tipOccurrences(): Promise<Collection<TipOccurrence>> {
+  await ensureIndexes();
+  return (await getDb()).collection<TipOccurrence>("tip_occurrences");
+}
+
+export async function ledgerEntries(): Promise<Collection<LedgerEntry>> {
+  await ensureIndexes();
+  return (await getDb()).collection<LedgerEntry>("ledger_entries");
 }

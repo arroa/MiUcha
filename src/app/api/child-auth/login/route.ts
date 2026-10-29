@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { children, families } from "@/lib/collections";
 import { childSessionCookieOptions, createChildSessionToken } from "@/lib/child-session";
 import { familyNameKey } from "@/lib/family-name";
-import { verifyPin } from "@/lib/pin";
+import { pinProblem, verifyPin } from "@/lib/pin";
 
 const LOCK_MS = 15 * 60 * 1000;
 
@@ -13,6 +13,10 @@ export async function POST(request: Request) {
   const pin = json?.pin?.trim() ?? "";
   if (!familyName || !pin) {
     return NextResponse.json({ error: "Escribe el nombre de tu familia y tu PIN." }, { status: 400 });
+  }
+  const problem = pinProblem(pin);
+  if (problem) {
+    return NextResponse.json({ error: problem }, { status: 400 });
   }
 
   const familyCol = await families();

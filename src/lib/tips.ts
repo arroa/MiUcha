@@ -7,7 +7,6 @@ export type TipView = {
   id: string;
   catalogKey: string | null;
   title: string;
-  description: string;
   amountMinor: number;
   frequency: TipFrequency;
   daysOfWeek: number[];
@@ -45,7 +44,6 @@ export async function updateFamilyTip(familyId: string, tipId: string, input: un
 
   const parsed = await parseTip(familyId, {
     title: current.title,
-    description: current.description,
     amountMinor: current.amountMinor,
     frequency: current.frequency,
     daysOfWeek: current.daysOfWeek,
@@ -55,7 +53,7 @@ export async function updateFamilyTip(familyId: string, tipId: string, input: un
     ...(input && typeof input === "object" ? input : {}),
   });
 
-  await col.updateOne({ _id: current._id }, { $set: parsed });
+  await col.updateOne({ _id: current._id }, { $set: parsed, $unset: { description: "" } });
   return toView({ _id: current._id, ...parsed });
 }
 
@@ -82,15 +80,10 @@ export async function saveFamilyCatalog(
     if (title.length > 80) throw new Error("El nombre de la tarea es demasiado largo.");
     const active = Boolean(item.active);
     const amountMinor = Number(item.amountMinor);
-    if (active && (!Number.isInteger(amountMinor) || amountMinor <= 0)) {
-      throw new Error(`Ponle un precio en pesos a ${title}.`);
-    }
-    const price = Number.isInteger(amountMinor) && amountMinor > 0 ? amountMinor : task.suggestedMinor;
-    const fields = taskFields(task.key, title, price, childIds, active);
-    if (current) await col.updateOne({ _id: current._id }, { $set: fields });
-    else if (active || title !== task.title) {
-      await col.insertOne({ _id: new ObjectId(), familyId: familyObjectId, ...fields, createdAt: new Date() });
-    }
+    if (!Number.isInteger(amountMinor) || amountMinor <= 0) throw new Error(`Ponle un precio en pesos a ${title}.`);
+    const fields = taskFields(task.key, title, amountMinor, childIds, active);
+    if (current) await col.updateOne({ _id: current._id }, { $set: fields, $unset: { description: "" } });
+    else await col.insertOne({ _id: new ObjectId(), familyId: familyObjectId, ...fields, createdAt: new Date() });
   }
 
   for (const item of items) {
@@ -102,7 +95,7 @@ export async function saveFamilyCatalog(
     if (!title || title.length > 80) throw new Error("La tarea necesita un nombre de hasta 80 caracteres.");
     const amountMinor = Number(item.amountMinor);
     if (!Number.isInteger(amountMinor) || amountMinor <= 0) throw new Error(`Ponle un precio en pesos a ${title}.`);
-    await col.updateOne({ _id: current._id }, { $set: taskFields(key, title, amountMinor, childIds, Boolean(item.active)) });
+    await col.updateOne({ _id: current._id }, { $set: taskFields(key, title, amountMinor, childIds, Boolean(item.active)), $unset: { description: "" } });
   }
 
   for (const item of items.filter((entry) => (entry.key ?? "").startsWith("new-"))) {
@@ -156,6 +149,7 @@ export async function dismissFamilyTask(familyId: string, key: string) {
     { familyId: familyObjectId, catalogKey: key },
     {
       $set: { ...taskFields(key, task.title, task.suggestedMinor, await activeChildIds(familyObjectId), false), hidden: true },
+      $unset: { description: "" },
       $setOnInsert: { _id: new ObjectId(), createdAt: new Date() },
     },
     { upsert: true },
@@ -166,7 +160,6 @@ function taskFields(catalogKey: string, title: string, amountMinor: number, chil
   return {
     catalogKey,
     title,
-    description: "",
     amountMinor,
     frequency: "daily" as const,
     daysOfWeek: [] as number[],
@@ -188,7 +181,6 @@ export async function assignChildToActiveTips(familyId: ObjectId, childId: Objec
 async function parseTip(familyId: string, input: unknown) {
   const json = (input ?? {}) as {
     title?: string;
-    description?: string;
     amountMinor?: number;
     frequency?: string;
     daysOfWeek?: number[];
@@ -199,9 +191,6 @@ async function parseTip(familyId: string, input: unknown) {
 
   const title = json.title?.trim() ?? "";
   if (!title || title.length > 80) throw new Error("El Tip necesita un nombre de hasta 80 caracteres.");
-
-  const description = json.description?.trim() ?? "";
-  if (description.length > 400) throw new Error("La descripción es demasiado larga.");
 
   const amountMinor = Number(json.amountMinor);
   if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
@@ -226,7 +215,6 @@ async function parseTip(familyId: string, input: unknown) {
 
   return {
     title,
-    description,
     amountMinor,
     frequency: frequency as TipFrequency,
     daysOfWeek,
@@ -258,7 +246,6 @@ function toView(tip: {
   _id: ObjectId;
   catalogKey?: string;
   title: string;
-  description: string;
   amountMinor: number;
   frequency: TipFrequency;
   daysOfWeek: number[];
@@ -271,7 +258,6 @@ function toView(tip: {
     id: tip._id.toHexString(),
     catalogKey: tip.catalogKey ?? null,
     title: tip.title,
-    description: tip.description,
     amountMinor: tip.amountMinor,
     frequency: tip.frequency,
     daysOfWeek: tip.daysOfWeek,

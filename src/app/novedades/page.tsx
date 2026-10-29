@@ -4,6 +4,7 @@ import { Suspense } from "react";
 
 import { FamilyAdmin } from "@/components/family-admin";
 import { AdultSignOut } from "@/components/sign-out";
+import { TaskReview } from "@/components/task-review";
 import { getAdultSession, mongoIsConfigured } from "@/lib/adult-session";
 import { listFamilies } from "@/lib/family-admin";
 
@@ -56,16 +57,20 @@ async function Novedades() {
             tips={[]}
           />
         </div>
-      ) : (
-        <>
-          <p className="mt-6 text-muted">Cuando un niño marque un Tip o pida plata, va a aparecer aquí.</p>
-          {adult.role === "banquero" ? (
-            <Link href="/familia" className="mt-8 inline-block rounded-2xl bg-accent px-5 py-3 font-bold text-white">
-              Familia
-            </Link>
-          ) : null}
-        </>
-      )}
+      ) : adult.role === "banquero" ? (
+        <Link href="/familia" className="mt-8 inline-block rounded-2xl bg-accent px-5 py-3 font-bold text-white">
+          Familia
+        </Link>
+      ) : null}
+      {adult.role === "auditor" || adult.role === "banquero" ? (
+        <section className="mt-8">
+          <h2 className="font-serif text-3xl">Novedades</h2>
+          <p className="mt-2 text-sm text-muted">Tareas que los niños dijeron que hicieron.</p>
+          <div className="mt-4">
+            <TaskReview />
+          </div>
+        </section>
+      ) : null}
     </main>
   );
 }

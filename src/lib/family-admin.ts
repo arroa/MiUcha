@@ -25,6 +25,13 @@ export async function requireBanquero() {
   return session;
 }
 
+export async function requireFamilyAdult() {
+  const session = await getAdultSession();
+  if (!session?.familyId || !session.adultId) return null;
+  if (session.role !== "banquero" && session.role !== "auditor") return null;
+  return session;
+}
+
 export async function listFamilies() {
   const rows = await (await families()).find({}).sort({ createdAt: -1 }).toArray();
   const people = await (await adults()).find({ role: "banquero" }).toArray();

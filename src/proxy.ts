@@ -21,6 +21,7 @@ function isPublic(pathname: string) {
     pathname.startsWith("/api/auth/dev-login") ||
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
+    pathname.startsWith("/api/child-auth/logout") ||
     pathname.startsWith("/api/cron")
   );
 }
@@ -50,6 +51,10 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
   if (isChildRoute(pathname)) {
     if (await readChildSessionFromRequest(request)) return NextResponse.next();
     return NextResponse.redirect(new URL("/entrar", request.url));
+  }
+
+  if (pathname.startsWith("/api/tip-occurrences") && (await readChildSessionFromRequest(request))) {
+    return NextResponse.next();
   }
 
   if (isPublic(pathname)) return NextResponse.next();

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, type ClipboardEvent, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent } from "react";
 
-import { PinHelp } from "@/components/pin-help";
+import { PinField } from "@/components/pin-help";
+import { isPin } from "@/lib/pin-rules";
 
 export function ChildSignIn() {
   const [familyName, setFamilyName] = useState("");
@@ -11,8 +12,11 @@ export function ChildSignIn() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const ready = familyName.trim().length > 0 && isPin(pin);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (!ready) return;
     setLoading(true);
     setError("");
     try {
@@ -47,13 +51,11 @@ export function ChildSignIn() {
             autoComplete="organization"
           />
         </label>
-        <div className="mt-4 text-sm">
-          <p id="pin-label">PIN</p>
-          <PinBoxes value={pin} onChange={setPin} />
-          <PinHelp />
+        <div className="mt-4">
+          <PinField label="PIN" value={pin} onChange={setPin} />
         </div>
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
-        <button disabled={loading} className="mt-6 w-full rounded-2xl bg-accent py-3 font-bold text-white disabled:opacity-50">
+        <button disabled={!ready || loading} className="mt-6 w-full rounded-2xl bg-accent py-3 font-bold text-white disabled:opacity-50">
           {loading ? "Entrando…" : "Entrar"}
         </button>
         <Link
@@ -64,89 +66,5 @@ export function ChildSignIn() {
         </Link>
       </form>
     </main>
-  );
-}
-
-function PinBoxes({ value, onChange }: { value: string; onChange: (pin: string) => void }) {
-  const boxes = useRef<Array<HTMLInputElement | null>>([]);
-
-  function focusBox(index: number) {
-    boxes.current[Math.max(0, Math.min(index, 5))]?.focus();
-  }
-
-  function apply(next: string, focus: number) {
-    const pin = next.replace(/\D/g, "").slice(0, 6);
-    onChange(pin);
-    focusBox(focus);
-  }
-
-  function onBoxChange(index: number, raw: string) {
-    const digits = raw.replace(/\D/g, "");
-    if (!digits) {
-      apply(value.slice(0, index) + value.slice(index + 1), index);
-      return;
-    }
-    if (digits.length > 1) {
-      const pin = (value.slice(0, index) + digits).slice(0, 6);
-      apply(pin, pin.length >= 6 ? 5 : pin.length);
-      return;
-    }
-    const pin = (value.slice(0, index) + digits + value.slice(index + 1)).slice(0, 6);
-    apply(pin, index < 5 ? index + 1 : 5);
-  }
-
-  function onKeyDown(index: number, event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Backspace") {
-      event.preventDefault();
-      if (value[index]) {
-        apply(value.slice(0, index) + value.slice(index + 1), index);
-        return;
-      }
-      if (index > 0) apply(value.slice(0, index - 1), index - 1);
-    }
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      focusBox(index - 1);
-    }
-    if (event.key === "ArrowRight") {
-      event.preventDefault();
-      focusBox(Math.min(index + 1, value.length));
-    }
-  }
-
-  function onPaste(event: ClipboardEvent<HTMLInputElement>) {
-    event.preventDefault();
-    const digits = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
-    if (digits) apply(digits, digits.length);
-  }
-
-  return (
-    <div className="mt-2 grid grid-cols-6 gap-2" role="group" aria-labelledby="pin-label">
-      {Array.from({ length: 6 }, (_, index) => (
-        <input
-          key={index}
-          ref={(node) => {
-            boxes.current[index] = node;
-          }}
-          value={value[index] ?? ""}
-          inputMode="numeric"
-          autoComplete={index === 0 ? "one-time-code" : "off"}
-          maxLength={index === 0 ? 6 : 1}
-          aria-label={`Número ${index + 1} del PIN`}
-          onChange={(event) => onBoxChange(index, event.target.value)}
-          onKeyDown={(event) => onKeyDown(index, event)}
-          onPaste={onPaste}
-          onFocus={(event) => {
-            const next = Math.min(index, value.length);
-            if (next !== index) {
-              focusBox(next);
-              return;
-            }
-            event.currentTarget.select();
-          }}
-          className="aspect-square w-full min-w-0 rounded-2xl border border-line bg-white text-center text-2xl font-bold tabular-nums outline-none focus:border-accent focus:ring-2 focus:ring-accent/25 sm:text-3xl"
-        />
-      ))}
-    </div>
   );
 }
