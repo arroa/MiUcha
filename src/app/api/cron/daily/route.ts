@@ -9,5 +9,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
   await ensureAllTodayTasks();
-  return NextResponse.json({ ok: true, interest: 0 });
+  return NextResponse.json({ ok: true });
 }

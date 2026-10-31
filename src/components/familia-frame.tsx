@@ -13,16 +13,16 @@ type FamilyDetail = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
-  interestPercent: number;
 };
 
-type ChildItem = { id: string; name: string; gender: "nino" | "nina"; birthDate: string; loginId: string };
+type ChildItem = { id: string; name: string; birthDate: string; loginId: string };
 type AuditorItem = { id: string; name: string; email: string };
 
 export function FamiliaFrame({
   personName,
   familyName,
-  isSuperAdmin,
+  showPanel,
+  role,
   via,
   databaseReady,
   selfEmail,
@@ -33,7 +33,8 @@ export function FamiliaFrame({
 }: {
   personName: string;
   familyName: string;
-  isSuperAdmin: boolean;
+  showPanel: boolean;
+  role: "banquero" | "auditor";
   via: "dev" | "clerk";
   databaseReady: boolean;
   selfEmail: string;
@@ -49,19 +50,25 @@ export function FamiliaFrame({
       <header className="sticky top-0 z-30 border-b border-line bg-background">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <div className="min-w-0">
-            {isSuperAdmin ? (
-              <Link href="/novedades" className="text-sm text-muted underline">
-                Superusuario
-              </Link>
-            ) : null}
             <h1 className="truncate font-serif text-4xl">{title}</h1>
             <p className="mt-1 truncate text-sm">
               <span className="font-bold">{personName}</span>
               <span className="text-muted"> · </span>
-              <span className="font-bold text-accent">Banquero</span>
+              <span className="font-bold text-accent">{role === "auditor" ? "Auditor" : "Banquero"}</span>
             </p>
           </div>
-          <AdultSignOut via={via} />
+          <div className="flex shrink-0 items-center gap-2">
+            {showPanel ? (
+              <Link
+                href="/panel"
+                className="inline-flex items-center gap-2 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-bold"
+              >
+                <PanelIcon />
+                Panel
+              </Link>
+            ) : null}
+            <AdultSignOut via={via} />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-3xl px-6 py-8">
@@ -72,6 +79,7 @@ export function FamiliaFrame({
         )}
         <FamilyAdmin
           isSuperAdmin={false}
+          auditor={role === "auditor"}
           selfEmail={selfEmail}
           selfName={personName}
           families={[]}
@@ -83,5 +91,16 @@ export function FamiliaFrame({
         />
       </main>
     </div>
+  );
+}
+
+function PanelIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-4">
+      <rect x="3" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" fill="none" stroke="currentColor" strokeWidth="2" />
+    </svg>
   );
 }

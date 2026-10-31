@@ -25,12 +25,10 @@ export async function GET() {
       pctInversion: family.pctInversion,
       pctGasto: family.pctGasto,
       pctDonaciones: family.pctDonaciones,
-      interestPercent: family.interestPercent,
     },
     children: childRows.map((child) => ({
       id: child._id.toHexString(),
       name: child.name,
-      gender: child.gender,
       birthDate: child.birthDate,
       loginId: child.loginId,
     })),
@@ -51,7 +49,6 @@ export async function PATCH(request: Request) {
     pctInversion?: number;
     pctGasto?: number;
     pctDonaciones?: number;
-    interestPercent?: number;
   } | null;
 
   try {
@@ -61,7 +58,6 @@ export async function PATCH(request: Request) {
       pctInversion: Number(json?.pctInversion),
       pctGasto: Number(json?.pctGasto),
       pctDonaciones: Number(json?.pctDonaciones),
-      interestPercent: Number(json?.interestPercent),
     });
     return NextResponse.json({ ok: true });
   } catch (error) {

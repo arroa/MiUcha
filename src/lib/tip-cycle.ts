@@ -13,7 +13,7 @@ import {
   type TipOccurrenceStatus,
 } from "@/lib/collections";
 import { requireFamilyAdult } from "@/lib/family-admin";
-import { getMongoClient } from "@/lib/mongodb";
+import { inMoneySession } from "@/lib/money";
 import { santiagoToday, weekdayOf } from "@/lib/santiago-date";
 
 export type TaskView = {
@@ -120,15 +120,28 @@ export async function confirmDay(child: Child, date: string, ids: string[]) {
   if (!result.matchedCount) throw new Error("Esas tareas ya no se pueden confirmar.");
 }
 
+async function withChildNames(rows: TipOccurrence[]): Promise<TaskView[]> {
+  const ids = rows.map((row) => row.childId);
+  const kids = ids.length ? await (await children()).find({ _id: { $in: ids } }).toArray() : [];
+  const names = new Map(kids.map((child) => [child._id.toHexString(), child.name]));
+  return rows.map((row) => toView(row, names.get(row.childId.toHexString()) ?? ""));
+}
+
 export async function listPendingTasks(familyId: string): Promise<TaskView[]> {
   const rows = await (await tipOccurrences())
     .find({ familyId: new ObjectId(familyId), status: "submitted" })
     .sort({ occurrenceDate: -1, submittedAt: 1 })
     .toArray();
-  const ids = rows.map((row) => row.childId);
-  const kids = await (await children()).find({ _id: { $in: ids } }).toArray();
-  const names = new Map(kids.map((child) => [child._id.toHexString(), child.name]));
-  return rows.map((row) => toView(row, names.get(row.childId.toHexString()) ?? ""));
+  return withChildNames(rows);
+}
+
+export async function listReviewedTasks(familyId: string): Promise<TaskView[]> {
+  const rows = await (await tipOccurrences())
+    .find({ familyId: new ObjectId(familyId), status: { $in: ["approved", "needs_improvement", "rejected"] } })
+    .sort({ occurrenceDate: -1, reviewedAt: -1 })
+    .limit(60)
+    .toArray();
+  return withChildNames(rows);
 }
 
 export async function submitTask(child: Child, taskId: string) {
@@ -214,29 +227,6 @@ async function payTip(occurrence: TipOccurrence, adultId: string, session?: Clie
   }
 }
 
-async function inMoneySession(work: (session?: ClientSession) => Promise<void>) {
-  const client = await getMongoClient();
-  const session = client.startSession();
-  try {
-    await session.withTransaction(async () => {
-      await work(session);
-    });
-  } catch (error) {
-    if (!isStandalone(error)) throw error;
-    await work(undefined);
-  } finally {
-    await session.endSession();
-  }
-}
-
-function isStandalone(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  if (error instanceof MongoServerError && (error.code === 20 || error.codeName === "IllegalOperation")) return true;
-  const message = "message" in error && typeof error.message === "string" ? error.message : "";
-  if (message.includes("replica set") || message.includes("Transaction numbers")) return true;
-  return "cause" in error ? isStandalone(error.cause) : false;
-}
-
 function toView(row: TipOccurrence, childName: string): TaskView {
   return {
     id: row._id.toHexString(),
@@ -260,4 +250,10 @@ export async function pendingForCurrentAdult() {
   const adult = await requireFamilyAdult();
   if (!adult?.familyId || !adult.adultId) return null;
   return { familyId: adult.familyId, adultId: adult.adultId, tasks: await listPendingTasks(adult.familyId) };
+}
+
+export async function historyForCurrentAdult() {
+  const adult = await requireFamilyAdult();
+  if (!adult?.familyId || !adult.adultId) return null;
+  return { tasks: await listReviewedTasks(adult.familyId) };
 }

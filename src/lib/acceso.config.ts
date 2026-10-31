@@ -1,5 +1,5 @@
 export const acceso = {
   producto: "MiUcha",
-  rutaDespuesDeEntrar: "/novedades",
+  rutaDespuesDeEntrar: "/despues",
   cookieDev: "miucha_dev_session",
 } as const;

@@ -1,13 +1,13 @@
 import { ObjectId } from "mongodb";
 
-import { getAdultSession } from "@/lib/adult-session";
-import { adults, children, families, wallets, type AdultRole, type WalletType } from "@/lib/collections";
+import { getAdultSession, getSuperAdminEmail, type AdultSession } from "@/lib/adult-session";
+import { adults, children, families, ledgerEntries, tipDefinitions, tipOccurrences, wallets, withdrawalRequests, type AdultRole, type WalletType } from "@/lib/collections";
 import { deleteClerkUser, ensureClerkUser, normalizeEmail } from "@/lib/clerk-users";
 import { familyNameKey } from "@/lib/family-name";
 import { hashPin, pinProblem, verifyPin } from "@/lib/pin";
 import { assignChildToActiveTips } from "@/lib/tips";
 
-const WALLET_TYPES: WalletType[] = ["inversion", "gasto", "donaciones"];
+const WALLET_TYPES: WalletType[] = ["gasto", "donaciones", "inversion"];
 
 function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -32,19 +32,30 @@ export async function requireFamilyAdult() {
   return session;
 }
 
-export async function listFamilies() {
+export async function listPanelFamilies(session: AdultSession) {
   const rows = await (await families()).find({}).sort({ createdAt: -1 }).toArray();
   const people = await (await adults()).find({ role: "banquero" }).toArray();
   const byId = new Map(people.map((person) => [person._id.toHexString(), person]));
-  return rows.map((family) => {
+  const roles = new Map(session.memberships.map((item) => [item.familyId, item.role]));
+  const visible = session.isSuperAdmin ? rows : rows.filter((family) => roles.has(family._id.toHexString()));
+  return visible.map((family) => {
     const banquero = byId.get(family.banqueroId.toHexString());
+    const id = family._id.toHexString();
     return {
-      id: family._id.toHexString(),
+      id,
       name: family.name,
       banqueroName: banquero?.name ?? "",
       banqueroEmail: banquero?.email ?? "",
+      myRole: roles.get(id) ?? null,
     };
   });
+}
+
+async function releaseClerkUser(email: string, clerkUserId: string) {
+  if (!email || email === getSuperAdminEmail()) return;
+  const still = await (await adults()).findOne({ email });
+  if (still) return;
+  await deleteClerkUser(clerkUserId);
 }
 
 export async function createFamily(input: { banqueroName: string; banqueroEmail: string }) {
@@ -52,10 +63,8 @@ export async function createFamily(input: { banqueroName: string; banqueroEmail:
   const email = normalizeEmail(input.banqueroEmail);
   if (!banqueroName || !isEmail(email)) throw new Error("Completa el nombre y el correo del banquero.");
 
-  const existing = await (await adults()).findOne({ email });
-  if (existing) throw new Error("Ese correo ya es adulto de una familia.");
-
-  const clerkUserId = await ensureClerkUser(email, banqueroName);
+  const already = await (await adults()).findOne({ email });
+  const clerkUserId = await ensureClerkUser(email, already ? undefined : banqueroName);
   const familyId = new ObjectId();
   const adultId = new ObjectId();
   const now = new Date();
@@ -70,7 +79,6 @@ export async function createFamily(input: { banqueroName: string; banqueroEmail:
     pctInversion: 50,
     pctGasto: 40,
     pctDonaciones: 10,
-    interestPercent: 0,
     timezone: "America/Santiago",
     currency: "CLP",
     createdAt: now,
@@ -91,21 +99,54 @@ export async function createFamily(input: { banqueroName: string; banqueroEmail:
 
 export async function renameFamilyCard(familyId: string, input: unknown) {
   if (!ObjectId.isValid(familyId)) throw new Error("Familia no encontrada.");
-  const json = (input ?? {}) as { name?: string; banqueroName?: string };
+  const json = (input ?? {}) as { name?: string; banqueroName?: string; banqueroEmail?: string };
   const name = json.name?.trim() ?? "";
   const banqueroName = json.banqueroName?.trim() ?? "";
+  const banqueroEmail = normalizeEmail(json.banqueroEmail ?? "");
   if (name.length > 80) throw new Error("El nombre de la familia es demasiado largo.");
   if (!banqueroName || banqueroName.length > 80) throw new Error("Ponle un nombre al banquero, de hasta 80 caracteres.");
+  if (!isEmail(banqueroEmail)) throw new Error("Escribe un correo válido para el banquero.");
 
   const family = await (await families()).findOne({ _id: new ObjectId(familyId) });
   if (!family) throw new Error("Familia no encontrada.");
-  const banquero = await (await adults()).findOne({ _id: family.banqueroId, role: "banquero" });
+  const col = await adults();
+  const banquero = await col.findOne({ _id: family.banqueroId, role: "banquero" });
   if (!banquero) throw new Error("Banquero no encontrado.");
+  const taken = await col.findOne({ email: banqueroEmail, familyId: family._id, _id: { $ne: banquero._id } });
+  if (taken) throw new Error("Ese correo ya está en esta familia.");
 
+  const clerkUserId = await ensureClerkUser(banqueroEmail, banqueroName);
+  const previousEmail = banquero.email;
+  const previousClerk = banquero.clerkUserId;
   await saveFamilyName(family._id, name);
-  await (await adults()).updateOne({ _id: banquero._id }, { $set: { name: banqueroName } });
-  await ensureClerkUser(banquero.email, banqueroName);
-  return { id: family._id.toHexString(), name, banqueroName, banqueroEmail: banquero.email };
+  await col.updateOne({ _id: banquero._id }, { $set: { name: banqueroName, email: banqueroEmail, clerkUserId } });
+  if (previousEmail !== banqueroEmail && previousClerk !== clerkUserId) await releaseClerkUser(previousEmail, previousClerk);
+  return { id: family._id.toHexString(), name, banqueroName, banqueroEmail };
+}
+
+export async function deleteFamily(familyId: string) {
+  if (!ObjectId.isValid(familyId)) throw new Error("Familia no encontrada.");
+  const id = new ObjectId(familyId);
+  const family = await (await families()).findOne({ _id: id });
+  if (!family) throw new Error("Familia no encontrada.");
+
+  const people = await (await adults()).find({ familyId: id }).toArray();
+  const superEmail = getSuperAdminEmail();
+  await (await children()).deleteMany({ familyId: id });
+  await (await wallets()).deleteMany({ familyId: id });
+  await (await tipDefinitions()).deleteMany({ familyId: id });
+  await (await tipOccurrences()).deleteMany({ familyId: id });
+  await (await withdrawalRequests()).deleteMany({ familyId: id });
+  await (await ledgerEntries()).deleteMany({ familyId: id });
+  await (await adults()).deleteMany({ familyId: id });
+  await (await families()).deleteOne({ _id: id });
+
+  for (const person of people) {
+    if (person.email === superEmail) continue;
+    await releaseClerkUser(person.email, person.clerkUserId);
+  }
+
+  return { id: familyId, name: family.name };
 }
 
 export function percentagesAreValid(pctInversion: number, pctGasto: number, pctDonaciones: number) {
@@ -119,7 +160,6 @@ export async function updateFamilyParameters(input: {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
-  interestPercent: number;
 }) {
   const name = input.name.trim();
   if (!name) throw new Error("Ponle un nombre a la familia.");
@@ -127,14 +167,10 @@ export async function updateFamilyParameters(input: {
   if (!percentagesAreValid(input.pctInversion, input.pctGasto, input.pctDonaciones)) {
     throw new Error("Los porcentajes de Inversión, Gasto y Donaciones tienen que sumar 100.");
   }
-  if (!Number.isInteger(input.interestPercent) || input.interestPercent < 0 || input.interestPercent > 100) {
-    throw new Error("La tasa de interés es un número entero entre 0 y 100.");
-  }
   await saveFamilyName(new ObjectId(input.familyId), name, {
     pctInversion: input.pctInversion,
     pctGasto: input.pctGasto,
     pctDonaciones: input.pctDonaciones,
-    interestPercent: input.interestPercent,
   });
 }
 
@@ -168,7 +204,6 @@ async function assertPinAvailable(familyId: ObjectId, pin: string, exceptChildId
 export async function createChildAccount(input: {
   familyId: string;
   name: string;
-  gender: "nino" | "nina";
   birthDate: string;
   loginId: string;
   pin: string;
@@ -181,7 +216,6 @@ export async function createChildAccount(input: {
   if (!/^[a-z0-9._-]{3,24}$/.test(loginId)) {
     throw new Error("El nombre en la casa usa letras minúsculas, números, punto o guion, de 3 a 24 caracteres.");
   }
-  if (input.gender !== "nino" && input.gender !== "nina") throw new Error("Indica si es niño o niña.");
 
   const now = new Date();
   const childId = new ObjectId();
@@ -193,7 +227,6 @@ export async function createChildAccount(input: {
     _id: childId,
     familyId,
     name,
-    gender: input.gender,
     birthDate: input.birthDate,
     loginId,
     pinHash: await hashPin(input.pin),
@@ -213,12 +246,12 @@ export async function createChildAccount(input: {
       updatedAt: now,
     })),
   );
-  return { id: childId.toHexString(), name, gender: input.gender, birthDate: input.birthDate, loginId };
+  return { id: childId.toHexString(), name, birthDate: input.birthDate, loginId };
 }
 
 export async function updateChildAccount(familyId: string, childId: string, input: unknown) {
   if (!ObjectId.isValid(childId)) throw new Error("Niño no encontrado.");
-  const json = (input ?? {}) as { name?: string; gender?: string; birthDate?: string; loginId?: string; pin?: string };
+  const json = (input ?? {}) as { name?: string; birthDate?: string; loginId?: string; pin?: string };
   const name = json.name?.trim() ?? "";
   const loginId = json.loginId?.trim().toLowerCase() ?? "";
   const birthDate = json.birthDate?.trim() ?? "";
@@ -228,7 +261,6 @@ export async function updateChildAccount(familyId: string, childId: string, inpu
   if (!/^[a-z0-9._-]{3,24}$/.test(loginId)) {
     throw new Error("El nombre en la casa usa letras minúsculas, números, punto o guion, de 3 a 24 caracteres.");
   }
-  if (json.gender !== "nino" && json.gender !== "nina") throw new Error("Indica si es niño o niña.");
   const pin = json.pin?.trim() ?? "";
 
   const col = await children();
@@ -241,20 +273,19 @@ export async function updateChildAccount(familyId: string, childId: string, inpu
 
   const fields: {
     name: string;
-    gender: "nino" | "nina";
     birthDate: string;
     loginId: string;
     pinHash?: string;
     pinAttempts?: number;
     pinLockedUntil?: Date | null;
-  } = { name, gender: json.gender, birthDate, loginId };
+  } = { name, birthDate, loginId };
   if (pin) {
     fields.pinHash = await hashPin(pin);
     fields.pinAttempts = 0;
     fields.pinLockedUntil = null;
   }
-  await col.updateOne({ _id: child._id }, { $set: fields });
-  return { id: child._id.toHexString(), name, gender: json.gender, birthDate, loginId };
+  await col.updateOne({ _id: child._id }, { $set: fields, $unset: { gender: "" } });
+  return { id: child._id.toHexString(), name, birthDate, loginId };
 }
 
 export async function deactivateChild(familyId: string, childId: string) {
@@ -266,20 +297,104 @@ export async function deactivateChild(familyId: string, childId: string) {
   if (!result.matchedCount) throw new Error("Niño no encontrado.");
 }
 
+export type ChildCartolaWallet = {
+  type: WalletType;
+  availableMinor: number;
+  earned12mMinor: number;
+  withdrawn12mMinor: number;
+};
+
+export type ChildCartola = {
+  pendingCount: number;
+  pendingSum: number;
+  withdrawalPendingCount: number;
+  withdrawalPendingSum: number;
+  wallets: ChildCartolaWallet[];
+};
+
+export async function getChildCartola(familyId: string, childId: string): Promise<ChildCartola> {
+  if (!ObjectId.isValid(childId)) throw new Error("Niño no encontrado.");
+  const familyObjectId = new ObjectId(familyId);
+  const childObjectId = new ObjectId(childId);
+  const child = await (await children()).findOne({ _id: childObjectId, familyId: familyObjectId, active: true });
+  if (!child) throw new Error("Niño no encontrado.");
+
+  const since = new Date();
+  since.setFullYear(since.getFullYear() - 1);
+
+  const [pending, walletRows, withdrawalPending, yearEntries] = await Promise.all([
+    (await tipOccurrences())
+      .find({ familyId: familyObjectId, childId: childObjectId, status: "submitted" })
+      .project({ amountMinor: 1 })
+      .toArray(),
+    (await wallets()).find({ familyId: familyObjectId, childId: childObjectId }).toArray(),
+    (await withdrawalRequests())
+      .find({ familyId: familyObjectId, childId: childObjectId, status: "pending" })
+      .project({ amountMinor: 1 })
+      .toArray(),
+    (await ledgerEntries())
+      .find({
+        familyId: familyObjectId,
+        childId: childObjectId,
+        createdAt: { $gte: since },
+        kind: { $in: ["tip", "interest", "withdrawal"] },
+      })
+      .project({ walletType: 1, amountMinor: 1, kind: 1 })
+      .toArray(),
+  ]);
+
+  const earned = new Map<WalletType, number>();
+  const withdrawn = new Map<WalletType, number>();
+  for (const row of yearEntries) {
+    if (row.kind === "withdrawal") {
+      withdrawn.set(row.walletType, (withdrawn.get(row.walletType) ?? 0) + Math.abs(row.amountMinor));
+      continue;
+    }
+    // Inversión: solo intereses abonados. Gasto/Donaciones: tips recibidos.
+    if (row.walletType === "inversion") {
+      if (row.kind === "interest" && row.amountMinor > 0) {
+        earned.set("inversion", (earned.get("inversion") ?? 0) + row.amountMinor);
+      }
+      continue;
+    }
+    if (row.kind === "tip" && row.amountMinor > 0) {
+      earned.set(row.walletType, (earned.get(row.walletType) ?? 0) + row.amountMinor);
+    }
+  }
+
+  const byType = new Map(walletRows.map((row) => [row.type, row.balanceMinor]));
+  const walletsView = WALLET_TYPES.map((type) => ({
+    type,
+    availableMinor: byType.get(type) ?? 0,
+    earned12mMinor: earned.get(type) ?? 0,
+    withdrawn12mMinor: withdrawn.get(type) ?? 0,
+  }));
+
+  return {
+    pendingCount: pending.length,
+    pendingSum: pending.reduce((sum, row) => sum + row.amountMinor, 0),
+    withdrawalPendingCount: withdrawalPending.length,
+    withdrawalPendingSum: withdrawalPending.reduce((sum, row) => sum + row.amountMinor, 0),
+    wallets: walletsView,
+  };
+}
+
 export async function createAuditorAccount(input: { familyId: string; name: string; email: string }) {
   const name = input.name.trim();
   const email = normalizeEmail(input.email);
   if (!name || !isEmail(email)) throw new Error("Completa el nombre y el correo del auditor.");
   const col = await adults();
-  const existing = await col.findOne({ email });
-  if (existing) throw new Error("Ese correo ya es adulto de una familia.");
+  const familyObjectId = new ObjectId(input.familyId);
+  const existing = await col.findOne({ email, familyId: familyObjectId });
+  if (existing) throw new Error("Ese correo ya está en esta familia.");
 
-  const clerkUserId = await ensureClerkUser(email, name);
+  const elsewhere = await col.findOne({ email });
+  const clerkUserId = await ensureClerkUser(email, elsewhere ? undefined : name);
   const now = new Date();
   const _id = new ObjectId();
   await col.insertOne({
     _id,
-    familyId: new ObjectId(input.familyId),
+    familyId: familyObjectId,
     role: "auditor" satisfies AdultRole,
     name,
     email,
@@ -301,12 +416,14 @@ export async function updateAuditorAccount(familyId: string, auditorId: string, 
   const familyObjectId = new ObjectId(familyId);
   const auditor = await col.findOne({ _id: new ObjectId(auditorId), familyId: familyObjectId, role: "auditor" });
   if (!auditor) throw new Error("Auditor no encontrado.");
-  const taken = await col.findOne({ email, _id: { $ne: auditor._id } });
-  if (taken) throw new Error("Ese correo ya es adulto de una familia.");
+  const taken = await col.findOne({ email, familyId: familyObjectId, _id: { $ne: auditor._id } });
+  if (taken) throw new Error("Ese correo ya está en esta familia.");
 
   const clerkUserId = await ensureClerkUser(email, name);
-  if (clerkUserId !== auditor.clerkUserId) await deleteClerkUser(auditor.clerkUserId);
+  const previousEmail = auditor.email;
+  const previousClerk = auditor.clerkUserId;
   await col.updateOne({ _id: auditor._id }, { $set: { name, email, clerkUserId } });
+  if (previousEmail !== email && previousClerk !== clerkUserId) await releaseClerkUser(previousEmail, previousClerk);
   return { id: auditor._id.toHexString(), name, email };
 }
 
@@ -319,8 +436,8 @@ export async function removeAuditor(familyId: string, auditorId: string) {
     role: "auditor",
   });
   if (!auditor) throw new Error("Auditor no encontrado.");
-  await deleteClerkUser(auditor.clerkUserId);
   await col.deleteOne({ _id: auditor._id });
+  await releaseClerkUser(auditor.email, auditor.clerkUserId);
 }
 
 

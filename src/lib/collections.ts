@@ -15,7 +15,8 @@ export type Family = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
-  interestPercent: number;
+  /** @deprecated Ya no se usa; los intereses los abona el banquero a mano. */
+  interestPercent?: number;
   timezone: "America/Santiago";
   currency: "CLP";
   createdAt: Date;
@@ -38,7 +39,6 @@ export type Child = {
   _id: ObjectId;
   familyId: ObjectId;
   name: string;
-  gender: "nino" | "nina";
   birthDate: string;
   loginId: string;
   pinHash: string;
@@ -90,6 +90,23 @@ export type LedgerEntry = {
   operationId: string;
   actorId: string;
   createdAt: Date;
+  newsReadAt?: Date | null;
+  newsDismissedAt?: Date | null;
+};
+
+export type WithdrawalStatus = "pending" | "completed" | "cancelled";
+
+export type WithdrawalRequest = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  walletType: WalletType;
+  amountMinor: number;
+  note: string;
+  status: WithdrawalStatus;
+  createdAt: Date;
+  completedAt: Date | null;
+  banqueroId: ObjectId | null;
 };
 
 export type TipDefinition = {
@@ -132,6 +149,7 @@ async function createIndexes() {
   const childCollection = db.collection("children");
   await backfillFamilyNameKeys(familyCollection);
   await dropIndexIfPresent(childCollection, "loginId_1");
+  await dropIndexIfPresent(db.collection("adults"), "email_1");
   await Promise.all([
     db.collection("adults").createIndex({ email: 1, familyId: 1 }, { unique: true }),
     db.collection("adults").createIndex({ clerkUserId: 1 }),
@@ -149,6 +167,8 @@ async function createIndexes() {
       { unique: true },
     ),
     db.collection("ledger_entries").createIndex({ operationId: 1, walletType: 1 }, { unique: true }),
+    db.collection("withdrawal_requests").createIndex({ familyId: 1, status: 1, createdAt: -1 }),
+    db.collection("withdrawal_requests").createIndex({ childId: 1, status: 1 }),
   ]);
 }
 
@@ -190,4 +210,9 @@ export async function tipOccurrences(): Promise<Collection<TipOccurrence>> {
 export async function ledgerEntries(): Promise<Collection<LedgerEntry>> {
   await ensureIndexes();
   return (await getDb()).collection<LedgerEntry>("ledger_entries");
+}
+
+export async function withdrawalRequests(): Promise<Collection<WithdrawalRequest>> {
+  await ensureIndexes();
+  return (await getDb()).collection<WithdrawalRequest>("withdrawal_requests");
 }

@@ -61,7 +61,6 @@ Hay un banquero activo por familia.
 | --- | --- |
 | `familyId` | Familia |
 | `name` | Nombre que ve la familia |
-| `gender` | `nino` o `nina` |
 | `birthDate` | Fecha de nacimiento |
 | `loginId` | Identificador para entrar. Único en toda la aplicación, para no revelar la familia |
 | `pinHash` | PIN de 6 dígitos, con hash lento y sal. No sale del servidor |

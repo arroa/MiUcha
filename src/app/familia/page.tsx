@@ -18,7 +18,7 @@ export default function FamiliaPage() {
 async function Familia() {
   const adult = await getAdultSession();
   if (!adult) redirect("/sign-in");
-  if (adult.role !== "banquero" || !adult.familyId) redirect("/novedades");
+  if (!adult.familyId || (adult.role !== "banquero" && adult.role !== "auditor")) redirect("/panel");
 
   const databaseReady = mongoIsConfigured();
   const familyId = new ObjectId(adult.familyId);
@@ -38,13 +38,11 @@ async function Familia() {
         pctInversion: doc.pctInversion,
         pctGasto: doc.pctGasto,
         pctDonaciones: doc.pctDonaciones,
-        interestPercent: doc.interestPercent,
       }
     : null;
   const childRows = childDocs.map((child) => ({
     id: child._id.toHexString(),
     name: child.name,
-    gender: child.gender,
     birthDate: child.birthDate,
     loginId: child.loginId,
   }));
@@ -58,7 +56,8 @@ async function Familia() {
     <FamiliaFrame
       personName={personName}
       familyName={family?.name || "Tu familia"}
-      isSuperAdmin={adult.isSuperAdmin}
+      showPanel={adult.isSuperAdmin || adult.memberships.length > 1}
+      role={adult.role === "auditor" ? "auditor" : "banquero"}
       via={adult.via}
       databaseReady={databaseReady}
       selfEmail={adult.email}

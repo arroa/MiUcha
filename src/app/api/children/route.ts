@@ -9,7 +9,6 @@ export async function POST(request: Request) {
 
   const json = (await request.json().catch(() => null)) as {
     name?: string;
-    gender?: "nino" | "nina";
     birthDate?: string;
     loginId?: string;
     pin?: string;
@@ -19,7 +18,6 @@ export async function POST(request: Request) {
     const child = await createChildAccount({
       familyId: session.familyId,
       name: json?.name ?? "",
-      gender: json?.gender === "nina" ? "nina" : "nino",
       birthDate: json?.birthDate ?? "",
       loginId: json?.loginId ?? "",
       pin: json?.pin ?? "",

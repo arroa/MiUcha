@@ -25,3 +25,14 @@ body {
   color: var(--foreground);
   font-family: var(--font-nunito), sans-serif;
 }
+
+@keyframes miucha-toast {
+  0% { opacity: 0; transform: translateY(-10px); }
+  12% { opacity: 1; transform: translateY(0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.miucha-toast {
+  animation: miucha-toast 3.2s ease forwards;
+}

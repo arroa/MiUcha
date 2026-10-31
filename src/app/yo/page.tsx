@@ -2,19 +2,15 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { DayCalendar, TaskCart } from "@/components/child-day";
+import { ChildMovements } from "@/components/child-movements";
+import { ChildWallets } from "@/components/child-wallets";
 import { NewsBell } from "@/components/news-bell";
 import { ChildSignOut } from "@/components/sign-out";
-import { getChildSession, walletsForChild } from "@/lib/child-account";
-import { addDays, dayLabel, santiagoToday } from "@/lib/santiago-date";
-import { ensureTasksForDate, listChildNews, type TaskView } from "@/lib/tip-cycle";
-
-const order = ["inversion", "gasto", "donaciones"] as const;
-
-const labels = {
-  inversion: "Inversión",
-  gasto: "Gasto",
-  donaciones: "Donaciones",
-} as const;
+import { getChildSession } from "@/lib/child-account";
+import { listChildMovements, listChildNotices } from "@/lib/child-feed";
+import { walletsSnapshot } from "@/lib/money";
+import { addDays, santiagoToday } from "@/lib/santiago-date";
+import { ensureTasksForDate } from "@/lib/tip-cycle";
 
 export default function YoPage({ searchParams }: { searchParams: Promise<{ dia?: string }> }) {
   return (
@@ -31,12 +27,6 @@ function chosenDay(raw: string | undefined, today: string) {
   return raw < oldest ? oldest : raw;
 }
 
-function newsText(task: TaskView) {
-  if (task.status === "approved") return `${task.title}: recibiste un tip de $${task.amountMinor.toLocaleString("es-CL")}.`;
-  if (task.status === "rejected") return task.reviewNote ? `${task.title} no quedó hecha. ${task.reviewNote}` : `${task.title} no quedó hecha.`;
-  return task.reviewNote ? `${task.title} puede mejorar. ${task.reviewNote}` : `${task.title} puede mejorar.`;
-}
-
 async function Yo({ searchParams }: { searchParams: Promise<{ dia?: string }> }) {
   const child = await getChildSession();
   if (!child) redirect("/entrar");
@@ -45,14 +35,21 @@ async function Yo({ searchParams }: { searchParams: Promise<{ dia?: string }> })
   const oldest = addDays(today, -60);
   const date = chosenDay(dia, today);
   if (dia && dia !== date) redirect(date === today ? "/yo" : `/yo?dia=${date}`);
-  const [wallets, tasks, news] = await Promise.all([walletsForChild(child), ensureTasksForDate(child, date), listChildNews(child)]);
-  const rows = order.map((type) => wallets.find((wallet) => wallet.type === type)).filter((wallet) => wallet !== undefined);
-  const approved = news.filter((task) => task.status === "approved");
-  const cheer = approved.length
-    ? `Terminaste ${approved.map((task) => task.title).join(" y ")} y recibiste tu tip.`
-    : news.some((task) => task.status === "needs_improvement")
-      ? "Hay una tarea que puede mejorar. Mírala en novedades."
-      : "Viniste a mirar tus Uchas. Elige el día y marca tus tareas.";
+  const [wallets, tasks, notices, movements] = await Promise.all([
+    walletsSnapshot(child.familyId, child._id),
+    ensureTasksForDate(child, date),
+    listChildNotices(child),
+    listChildMovements(child),
+  ]);
+  const tipApproved = notices.filter((item) => item.kind === "tip" && item.text.includes("recibiste un tip"));
+  const interestUnread = notices.some((item) => item.kind === "interest" && !item.read);
+  const cheer = tipApproved.length
+    ? `Terminaste y recibiste tu tip.`
+    : interestUnread
+      ? "Te llegaron intereses. Míralos en la campana."
+      : notices.some((item) => item.kind === "tip" && item.text.includes("puede mejorar"))
+        ? "Hay una tarea que puede mejorar. Mírala en la campana."
+        : "Viniste a mirar tus Uchas. Elige el día y marca tus tareas.";
 
   return (
     <main className="mx-auto min-h-full max-w-3xl px-6 py-10">
@@ -60,26 +57,21 @@ async function Yo({ searchParams }: { searchParams: Promise<{ dia?: string }> })
         <h1 className="min-w-0 font-serif text-5xl">¡Hola, {child.name}!</h1>
         <div className="flex shrink-0 items-center gap-2">
           <NewsBell
-            items={news.map((item) => ({
+            items={notices.map((item) => ({
               id: item.id,
-              when: dayLabel(item.occurrenceDate, today),
-              text: newsText(item),
+              kind: item.kind,
+              when: item.when,
+              text: item.text,
               read: item.read,
             }))}
           />
           <ChildSignOut name={child.name} cheer={cheer} />
         </div>
       </header>
-      <div className="mt-8 grid gap-4 sm:grid-cols-3">
-        {rows.map((wallet) => (
-          <article key={wallet.type} className="rounded-3xl border border-line bg-card p-5">
-            <p className="text-sm text-muted">{labels[wallet.type]}</p>
-            <p className="mt-2 font-serif text-4xl">${wallet.balanceMinor.toLocaleString("es-CL")}</p>
-          </article>
-        ))}
-      </div>
+      <ChildWallets initial={wallets} />
       <DayCalendar today={today} selected={date} oldest={oldest} />
       <TaskCart date={date} today={today} tasks={tasks} />
+      <ChildMovements rows={movements} />
     </main>
   );
 }

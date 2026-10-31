@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 
 export type NewsItem = {
   id: string;
+  kind: "tip" | "interest";
   when: string;
   text: string;
   read: boolean;
@@ -40,14 +41,14 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
     };
   }, [open]);
 
-  async function act(id: string, action: "read" | "dismiss") {
+  async function act(id: string, kind: NewsItem["kind"], action: "read" | "dismiss") {
     setBusyId(id);
     setError("");
     try {
-      const res = await fetch(`/api/tip-occurrences/${id}/news`, {
+      const res = await fetch("/api/child-news", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ id, kind, action }),
       });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
@@ -81,10 +82,10 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
       {open ? (
         <div id={panelId} className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border border-line bg-card p-3 shadow-lg">
           <p className="px-2 py-1 font-serif text-2xl">Novedades</p>
-          {rows.length === 0 ? <p className="px-2 py-3 text-sm text-muted">Cuando revisen tus tareas, el resultado aparece aquí.</p> : null}
+          {rows.length === 0 ? <p className="px-2 py-3 text-sm text-muted">Cuando haya tips o intereses, aparecen aquí.</p> : null}
           <ul className="grid max-h-80 gap-2 overflow-auto">
             {rows.map((item) => (
-              <li key={item.id} className="rounded-2xl border border-line bg-white px-3 py-3">
+              <li key={`${item.kind}-${item.id}`} className="rounded-2xl border border-line bg-white px-3 py-3">
                 <div className="flex gap-2">
                   {item.read ? <span className="mt-1 size-2 shrink-0 rounded-full bg-line" /> : <span className="mt-1 size-2 shrink-0 rounded-full bg-accent" />}
                   <div className="min-w-0">
@@ -96,11 +97,11 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
                   {item.read ? (
                     <span className="text-sm font-bold text-accent">Leída</span>
                   ) : (
-                    <button type="button" disabled={busyId === item.id} onClick={() => act(item.id, "read")} className="text-sm font-bold text-accent disabled:opacity-50">
+                    <button type="button" disabled={busyId === item.id} onClick={() => act(item.id, item.kind, "read")} className="text-sm font-bold text-accent disabled:opacity-50">
                       Marcar leída
                     </button>
                   )}
-                  <button type="button" disabled={busyId === item.id} onClick={() => act(item.id, "dismiss")} className="text-sm font-bold text-red-800 disabled:opacity-50">
+                  <button type="button" disabled={busyId === item.id} onClick={() => act(item.id, item.kind, "dismiss")} className="text-sm font-bold text-red-800 disabled:opacity-50">
                     Eliminar
                   </button>
                 </div>

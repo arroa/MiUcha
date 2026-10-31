@@ -53,7 +53,14 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     return NextResponse.redirect(new URL("/entrar", request.url));
   }
 
-  if (pathname.startsWith("/api/tip-occurrences") && (await readChildSessionFromRequest(request))) {
+  if (
+    (pathname.startsWith("/api/tip-occurrences") ||
+      pathname.startsWith("/api/wallets") ||
+      pathname.startsWith("/api/withdrawals") ||
+      pathname.startsWith("/api/transfers") ||
+      pathname.startsWith("/api/child-news")) &&
+    (await readChildSessionFromRequest(request))
+  ) {
     return NextResponse.next();
   }
 

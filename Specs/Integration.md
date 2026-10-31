@@ -68,8 +68,8 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | Renombrar en la tarjeta | `PATCH /api/families/:id` | Superusuario | Nombre de la familia, único, y nombre del banquero | Esos dos nombres |
 | Ver parámetros | `GET /api/families/current` | Banquero | — | Nombre, porcentajes, tasa, niños y auditores |
 | Guardar parámetros | `PATCH /api/families/current` | Banquero | Nombre único, porcentajes y `interestPercent` | El nombre y los tres porcentajes, si suman 100 |
-| Crear niño | `POST /api/children` | Banquero | Nombre, niño o niña, nacimiento, nombre en la casa, PIN | Niño y tres Uchas en cero |
-| Modificar niño | `PATCH /api/children/:id` | Banquero | Nombre, niño o niña, nacimiento, nombre en la casa y PIN si cambia | El niño |
+| Crear niño | `POST /api/children` | Banquero | Nombre, nacimiento, nombre en la casa, PIN | Niño y tres Uchas en cero |
+| Modificar niño | `PATCH /api/children/:id` | Banquero | Nombre, nacimiento, nombre en la casa y PIN si cambia | El niño |
 | Dar de baja niño | `PATCH /api/children/:id` | Banquero | `active: false` | El niño ya no entra. El libro sigue |
 | Restablecer PIN | `POST /api/children/:id/pin` | Banquero | PIN nuevo | PIN reemplazado |
 | Crear auditor | `POST /api/auditors` | Banquero | Nombre y correo | Auditor creado en Clerk |

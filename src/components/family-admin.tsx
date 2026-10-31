@@ -4,11 +4,18 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
 import { FamilyTips } from "@/components/family-tips";
 import { PinField } from "@/components/pin-help";
+import { TaskReview } from "@/components/task-review";
 import { isPin } from "@/lib/pin-rules";
 import type { TipView } from "@/lib/tips";
 
-type FamilyListItem = { id: string; name: string; banqueroName: string; banqueroEmail: string };
-type ChildItem = { id: string; name: string; gender: "nino" | "nina"; birthDate: string; loginId: string };
+type FamilyListItem = {
+  id: string;
+  name: string;
+  banqueroName: string;
+  banqueroEmail: string;
+  myRole: "banquero" | "auditor" | null;
+};
+type ChildItem = { id: string; name: string; birthDate: string; loginId: string };
 type AuditorItem = { id: string; name: string; email: string };
 type FamilyDetail = {
   id: string;
@@ -16,11 +23,11 @@ type FamilyDetail = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
-  interestPercent: number;
 };
 
 export function FamilyAdmin({
   isSuperAdmin,
+  auditor = false,
   selfEmail,
   selfName,
   families,
@@ -31,6 +38,7 @@ export function FamilyAdmin({
   onFamilyRenamed,
 }: {
   isSuperAdmin: boolean;
+  auditor?: boolean;
   selfEmail: string;
   selfName: string;
   families: FamilyListItem[];
@@ -40,63 +48,108 @@ export function FamilyAdmin({
   tips: TipView[];
   onFamilyRenamed?: (name: string) => void;
 }) {
-  const ownsFamily = families.some((item) => item.banqueroEmail === selfEmail);
   return (
     <div className="mx-auto grid max-w-3xl gap-8">
-      {isSuperAdmin ? <FamilyList families={families} selfEmail={selfEmail} /> : null}
-      {isSuperAdmin && !ownsFamily ? <CreateMine email={selfEmail} defaultName={selfName} /> : null}
-      {isSuperAdmin ? <CreateFamily /> : null}
-      {family ? <BanqueroPanel family={family} children={children} auditors={auditors} tips={tips} onFamilyRenamed={onFamilyRenamed} /> : null}
+      {isSuperAdmin || families.length > 0 ? <FamilyList families={families} selfEmail={selfEmail} selfName={selfName} manage={isSuperAdmin} /> : null}
+      {family ? <BanqueroPanel family={family} children={children} auditors={auditors} tips={tips} onFamilyRenamed={onFamilyRenamed} auditor={auditor} /> : null}
     </div>
   );
 }
 
-function FamilyList({ families, selfEmail }: { families: FamilyListItem[]; selfEmail: string }) {
+function FamilyList({
+  families,
+  selfEmail,
+  selfName,
+  manage,
+}: {
+  families: FamilyListItem[];
+  selfEmail: string;
+  selfName: string;
+  manage: boolean;
+}) {
   const [rows, setRows] = useState(families);
-  const [toast, setToast] = useState("");
+  const [toast, setToast] = useToast();
+  const ordered = [...rows].sort((a, b) => Number(b.myRole === "banquero") - Number(a.myRole === "banquero"));
+  const mine = ordered.find((item) => item.myRole === "banquero") ?? null;
+  const others = ordered.filter((item) => item !== mine);
 
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 3200);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  function cardProps(item: FamilyListItem, isMine: boolean) {
+    return {
+      item,
+      mine: isMine,
+      onSaved: (next: FamilyListItem) => {
+        setRows((current) => current.map((row) => (row.id === next.id ? next : row)));
+        setToast(`${next.name.trim() || "La familia"} quedó guardada.`);
+      },
+      onRemoved: (removed: FamilyListItem & { mine: boolean }) => {
+        if (removed.mine) {
+          window.location.assign("/panel");
+          return;
+        }
+        setRows((current) => current.filter((row) => row.id !== removed.id));
+        setToast(`${removed.name.trim() || "La familia"} ya no está.`);
+      },
+    };
+  }
 
   return (
-    <section className="rounded-3xl border border-line bg-card p-6">
+    <section>
       <h2 className="font-serif text-3xl">Familias</h2>
-      {rows.length === 0 ? <p className="mt-3 text-sm text-muted">Todavía no hay familias.</p> : null}
-      <ul className="mt-5 grid gap-3">
-        {rows.map((item) => (
-          <FamilyCard
-            key={item.id}
-            item={item}
-            mine={item.banqueroEmail === selfEmail}
-            onSaved={(next) => {
-              setRows((current) => current.map((row) => (row.id === next.id ? next : row)));
-              setToast(`Listo. El banquero se llama ${next.banqueroName}.`);
+      <ul className="mt-5 grid grid-cols-2 items-stretch gap-3">
+        {mine ? <FamilyCard key={mine.id} {...cardProps(mine, true)} manage={manage} /> : manage ? <CreateMineCard email={selfEmail} defaultName={selfName} /> : null}
+        {manage ? (
+          <NewFamilyCard
+            selfEmail={selfEmail}
+            onCreated={(item) => {
+              setRows((current) => [item, ...current.filter((row) => row.id !== item.id)]);
+              const who = item.banqueroName.trim() || "el banquero";
+              setToast(item.name.trim() ? `${item.name.trim()} quedó creada.` : `La familia de ${who} quedó creada.`);
             }}
           />
+        ) : null}
+        {others.map((item) => (
+          <FamilyCard key={item.id} {...cardProps(item, false)} manage={manage} />
         ))}
       </ul>
-      {toast ? (
-        <p role="status" className="fixed bottom-6 left-1/2 z-50 max-w-sm -translate-x-1/2 rounded-2xl bg-foreground px-5 py-3 text-center text-sm font-bold text-background shadow-lg">
-          {toast}
-        </p>
-      ) : null}
+      <Notice message={toast} />
     </section>
   );
 }
 
-function FamilyCard({ item, mine, onSaved }: { item: FamilyListItem; mine: boolean; onSaved: (item: FamilyListItem) => void }) {
+function FamilyCard({
+  item,
+  mine,
+  manage,
+  onSaved,
+  onRemoved,
+}: {
+  item: FamilyListItem;
+  mine: boolean;
+  manage: boolean;
+  onSaved: (item: FamilyListItem) => void;
+  onRemoved: (item: FamilyListItem & { mine: boolean }) => void;
+}) {
   const [editing, setEditing] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [name, setName] = useState(item.name);
   const [banqueroName, setBanqueroName] = useState(item.banqueroName);
+  const [banqueroEmail, setBanqueroEmail] = useState(item.banqueroEmail);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!confirming || busy) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setConfirming(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [confirming, busy]);
 
   function beginEdit() {
     setName(item.name);
     setBanqueroName(item.banqueroName);
+    setBanqueroEmail(item.banqueroEmail);
     setError("");
     setEditing(true);
   }
@@ -104,6 +157,7 @@ function FamilyCard({ item, mine, onSaved }: { item: FamilyListItem; mine: boole
   function cancel() {
     setName(item.name);
     setBanqueroName(item.banqueroName);
+    setBanqueroEmail(item.banqueroEmail);
     setError("");
     setEditing(false);
   }
@@ -115,75 +169,143 @@ function FamilyCard({ item, mine, onSaved }: { item: FamilyListItem; mine: boole
       const res = await fetch(`/api/families/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, banqueroName }),
+        body: JSON.stringify({ name, banqueroName, banqueroEmail }),
       });
       const data = (await res.json().catch(() => null)) as { error?: string; family?: { name: string; banqueroName: string; banqueroEmail: string } } | null;
       if (!res.ok || !data?.family) {
         setError(data?.error ?? "No se pudo guardar.");
         return;
       }
+      const next = { ...item, name: data.family.name, banqueroName: data.family.banqueroName, banqueroEmail: data.family.banqueroEmail };
       setEditing(false);
-      onSaved({ ...item, name: data.family.name, banqueroName: data.family.banqueroName, banqueroEmail: data.family.banqueroEmail });
+      if (mine && next.banqueroEmail !== item.banqueroEmail) {
+        window.location.assign("/panel");
+        return;
+      }
+      onSaved(next);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/families/${item.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setError(data?.error ?? "No se pudo eliminar la familia.");
+        return;
+      }
+      setConfirming(false);
+      onRemoved({ ...item, mine });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <li className="rounded-2xl border border-line bg-white p-4">
-      <p className="text-sm font-bold text-accent">{mine ? "Tu familia" : "Familia"}</p>
+    <li className="flex h-full flex-col rounded-2xl border border-line bg-white p-3">
+      <p className="text-xs font-bold text-accent">{mine ? "Mi familia" : item.myRole === "auditor" ? "Auditor" : item.myRole === "banquero" ? "Banquero" : "Familia"}</p>
       {editing ? (
-        <label className="mt-3 block text-sm">
+        <label className="mt-2 block text-xs">
           Nombre de la familia
-          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3" />
+          <input value={name} onChange={(event) => setName(event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm" />
         </label>
       ) : (
-        <p className="mt-1 font-serif text-2xl">{item.name.trim() || "Todavía sin nombre"}</p>
+        <p className="mt-0.5 truncate font-serif text-xl leading-tight">{item.name.trim() || "Todavía sin nombre"}</p>
       )}
       {editing ? (
-        <label className="mt-3 block text-sm">
+        <label className="mt-2 block text-xs">
           Nombre del banquero
-          <input value={banqueroName} onChange={(event) => setBanqueroName(event.target.value)} className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3" />
+          <input value={banqueroName} onChange={(event) => setBanqueroName(event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm" />
         </label>
       ) : (
-        <>
-          <p className="mt-3 text-sm text-muted">Banquero</p>
-          <p className="font-bold">{item.banqueroName}</p>
-        </>
+        <p className="mt-2 truncate text-sm font-bold">{item.banqueroName}</p>
       )}
-      <p className={`${editing ? "mt-3" : "mt-1"} text-sm text-muted`}>{item.banqueroEmail}</p>
-      {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
-      <div className={`mt-4 grid gap-2 ${mine || editing ? "grid-cols-2" : "grid-cols-1"}`}>
+      {editing ? (
+        <label className="mt-2 block text-xs">
+          Correo del banquero
+          <input type="email" value={banqueroEmail} onChange={(event) => setBanqueroEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-line bg-white px-3 py-2 text-sm" />
+        </label>
+      ) : (
+        <p className="truncate text-xs text-muted">{item.banqueroEmail}</p>
+      )}
+      {error ? <p className="mt-2 text-xs text-red-700">{error}</p> : null}
+      <div className="mt-auto grid grid-cols-2 gap-1.5 pt-3">
         {editing ? (
           <>
-            <button type="button" disabled={busy} onClick={save} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={save} className="rounded-xl bg-accent px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
               {busy ? "Guardando…" : "Guardar"}
             </button>
-            <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={cancel} className="rounded-xl border border-foreground/20 px-3 py-2 text-sm font-bold disabled:opacity-50">
               Cancelar
             </button>
           </>
         ) : (
           <>
-            <button type="button" onClick={beginEdit} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold">
-              Editar
-            </button>
-            {mine ? (
-              <a href="/familia" className="rounded-2xl bg-accent px-4 py-3 text-center font-bold text-white">
+            {manage ? (
+              <button type="button" onClick={beginEdit} className="rounded-xl border border-foreground/20 px-3 py-2 text-sm font-bold">
+                Editar
+              </button>
+            ) : null}
+            {item.myRole ? (
+              <a href={`/api/families/enter?id=${item.id}`} className={`rounded-xl bg-accent px-3 py-2 text-center text-sm font-bold text-white ${manage ? "" : "col-span-2"}`}>
                 Entrar
               </a>
+            ) : null}
+            {manage ? (
+              <button type="button" onClick={() => { setError(""); setConfirming(true); }} className={`rounded-xl border border-red-800/30 px-3 py-2 text-sm font-bold text-red-800 ${item.myRole ? "col-span-2" : ""}`}>
+                Eliminar
+              </button>
             ) : null}
           </>
         )}
       </div>
+      {confirming ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) setConfirming(false); }}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="eliminar-familia"
+            className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="eliminar-familia" className="font-serif text-3xl">
+              ¿Eliminar {item.name.trim() || "esta familia"}?
+            </h2>
+            <p className="mt-3">Se borran el banquero, los niños, las tareas y la plata. No se puede deshacer.</p>
+            {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+            <div className="mt-6 grid grid-cols-2 gap-2">
+              <button type="button" disabled={busy} onClick={remove} className="rounded-2xl bg-red-800 px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Eliminando…" : "Eliminar"}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setConfirming(false)} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </li>
   );
 }
 
-function CreateMine({ email, defaultName }: { email: string; defaultName: string }) {
+function CreateMineCard({ email, defaultName }: { email: string; defaultName: string }) {
+  const [open, setOpen] = useState(false);
   const [name, setName] = useState(defaultName);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || busy) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, busy]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -207,29 +329,56 @@ function CreateMine({ email, defaultName }: { email: string; defaultName: string
   }
 
   return (
-    <section className="rounded-3xl border border-line bg-card p-6">
-      <h2 className="font-serif text-3xl">Mi familia</h2>
-      <p className="mt-1 text-sm text-muted">Tú guardas la plata. Después le pones el nombre.</p>
-      <form onSubmit={onSubmit} className="mt-5 grid gap-3">
-        <Input label="Tu nombre" value={name} onChange={setName} />
-        <p className="text-sm">
-          Correo
-          <span className="mt-1.5 block rounded-2xl border border-line bg-background px-4 py-3">{email}</span>
-        </p>
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
-          {busy ? "Creando…" : "Crear mi familia"}
-        </button>
-      </form>
-    </section>
+    <li className="rounded-2xl border border-line bg-white">
+      <button type="button" onClick={() => setOpen(true)} className="flex h-full min-h-36 w-full flex-col items-center justify-center gap-3 rounded-2xl px-3 py-4">
+        <span className="text-xs font-bold text-accent">Mi familia</span>
+        <span className="rounded-full border border-foreground/15 bg-background px-5 py-2 font-serif text-xl">Crear</span>
+      </button>
+      {open ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) setOpen(false); }}>
+          <form
+            onSubmit={onSubmit}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="crear-mi-familia"
+            className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="crear-mi-familia" className="font-serif text-3xl">Mi familia</h2>
+            <p className="mt-2 text-sm text-muted">Tú guardas la plata. Después le pones el nombre.</p>
+            <div className="mt-5 grid gap-3">
+              <Input label="Tu nombre" value={name} onChange={setName} />
+              <p className="text-sm">
+                Correo
+                <span className="mt-1.5 block rounded-2xl border border-line bg-background px-4 py-3">{email}</span>
+              </p>
+              {error ? <p className="text-sm text-red-700">{error}</p> : null}
+              <button disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Creando…" : "Crear mi familia"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </li>
   );
 }
 
-function CreateFamily() {
+function NewFamilyCard({ selfEmail, onCreated }: { selfEmail: string; onCreated: (item: FamilyListItem) => void }) {
+  const [open, setOpen] = useState(false);
   const [banqueroName, setBanqueroName] = useState("");
   const [banqueroEmail, setBanqueroEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!open || busy) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, busy]);
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -241,36 +390,63 @@ function CreateFamily() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ banqueroName, banqueroEmail }),
       });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as { error?: string; family?: { id: string; name: string } } | null;
+      if (!res.ok || !data?.family) {
         setError(data?.error ?? "No se pudo crear la familia.");
         return;
       }
-      window.location.reload();
+      const email = banqueroEmail.trim().toLowerCase();
+      onCreated({
+        id: data.family.id,
+        name: data.family.name,
+        banqueroName: banqueroName.trim(),
+        banqueroEmail: email,
+        myRole: email === selfEmail ? "banquero" : null,
+      });
+      setBanqueroName("");
+      setBanqueroEmail("");
+      setOpen(false);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <section className="rounded-3xl border border-line bg-card p-6">
-      <h2 className="font-serif text-3xl">Otra familia</h2>
-      <p className="mt-1 text-sm text-muted">Creas al banquero. Él le pone el nombre a su familia.</p>
-      <form onSubmit={onSubmit} className="mt-5 grid gap-3">
-        <Input label="Nombre del banquero" value={banqueroName} onChange={setBanqueroName} />
-        <Input label="Correo del banquero" type="email" value={banqueroEmail} onChange={setBanqueroEmail} />
-        {error ? <p className="text-sm text-red-700">{error}</p> : null}
-        <button disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
-          {busy ? "Creando…" : "Crear familia"}
-        </button>
-      </form>
-    </section>
+    <li className="rounded-2xl border border-line bg-white">
+      <button type="button" onClick={() => setOpen(true)} className="flex h-full min-h-36 w-full items-center justify-center rounded-2xl px-3 py-4">
+        <span className="rounded-full border border-foreground/15 bg-background px-6 py-2.5 font-serif text-xl shadow-sm">Nueva</span>
+      </button>
+      {open ? (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) setOpen(false); }}>
+          <form
+            onSubmit={onSubmit}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="nueva-familia"
+            className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h2 id="nueva-familia" className="font-serif text-3xl">Nueva familia</h2>
+            <p className="mt-2 text-sm text-muted">Creas al banquero. Él le pone el nombre a su familia.</p>
+            <div className="mt-5 grid gap-3">
+              <Input label="Nombre del banquero" value={banqueroName} onChange={setBanqueroName} />
+              <Input label="Correo del banquero" type="email" value={banqueroEmail} onChange={setBanqueroEmail} />
+              {error ? <p className="text-sm text-red-700">{error}</p> : null}
+              <button disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Creando…" : "Crear familia"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </li>
   );
 }
 
-type SectionId = "datos" | "ninos" | "auditores" | "tips";
+type SectionId = "auditar" | "datos" | "ninos" | "auditores" | "tips";
 
 const SECTIONS: { id: SectionId; short: string }[] = [
+  { id: "auditar", short: "Movimientos" },
   { id: "datos", short: "Datos" },
   { id: "ninos", short: "Niños" },
   { id: "auditores", short: "Auditores" },
@@ -283,28 +459,21 @@ function BanqueroPanel({
   auditors,
   tips,
   onFamilyRenamed,
+  auditor = false,
 }: {
   family: FamilyDetail;
   children: ChildItem[];
   auditors: AuditorItem[];
   tips: TipView[];
   onFamilyRenamed?: (name: string) => void;
+  auditor?: boolean;
 }) {
-  const [open, setOpen] = useState<SectionId | null>(null);
+  const [open, setOpen] = useState<SectionId>("auditar");
   const [params, setParams] = useState(family);
   const [childRows, setChildRows] = useState(children);
   const [auditorRows, setAuditorRows] = useState(auditors);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    document.getElementById(`panel-${open}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [open]);
-
-  function toggle(id: SectionId) {
-    setOpen((current) => (current === id ? null : id));
-  }
 
   async function saveParams(event: FormEvent) {
     event.preventDefault();
@@ -318,7 +487,6 @@ function BanqueroPanel({
         pctInversion: Number(params.pctInversion),
         pctGasto: Number(params.pctGasto),
         pctDonaciones: Number(params.pctDonaciones),
-        interestPercent: Number(params.interestPercent),
       }),
     });
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
@@ -332,44 +500,35 @@ function BanqueroPanel({
 
   return (
     <div className="grid gap-4">
-      {open ? (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {SECTIONS.map((section) => (
-            <button
-              key={section.id}
-              type="button"
-              aria-pressed={open === section.id}
-              onClick={() => toggle(section.id)}
-              className={`rounded-2xl border px-3 py-3 text-left font-serif text-lg ${open === section.id ? "border-accent bg-accent/10" : "border-line bg-white"}`}
-            >
-              {section.short}
-            </button>
-          ))}
-        </div>
-      ) : null}
-      <div className={open ? "grid" : "grid gap-4 sm:grid-cols-2"}>
-        <div className={open && open !== "datos" ? "hidden" : ""}>
-          <DatosPanel
-            mode={open === "datos" ? "open" : "preview"}
-            onToggle={() => toggle("datos")}
-            params={params}
-            setParams={setParams}
-            onSubmit={saveParams}
-            error={error}
-            message={message}
-          />
-        </div>
-        <div className={open && open !== "ninos" ? "hidden" : ""}>
-          <Children mode={open === "ninos" ? "open" : "preview"} onToggle={() => toggle("ninos")} rows={childRows} setRows={setChildRows} />
-        </div>
-        <div className={open && open !== "auditores" ? "hidden" : ""}>
-          <Auditors mode={open === "auditores" ? "open" : "preview"} onToggle={() => toggle("auditores")} rows={auditorRows} setRows={setAuditorRows} />
-        </div>
-        <div className={open && open !== "tips" ? "hidden" : ""}>
-          <FamilyTips mode={open === "tips" ? "open" : "preview"} onToggle={() => toggle("tips")} initialTips={tips} />
-        </div>
+      <div className={`grid grid-cols-2 gap-2 ${auditor ? "sm:grid-cols-3" : "sm:grid-cols-5"}`}>
+        {(auditor ? SECTIONS.filter((section) => section.id === "auditar" || section.id === "datos" || section.id === "ninos") : SECTIONS).map((section) => (
+          <button
+            key={section.id}
+            type="button"
+            aria-pressed={open === section.id}
+            onClick={() => setOpen(section.id)}
+            className={`rounded-2xl border px-3 py-3 text-left font-serif text-lg ${open === section.id ? "border-accent bg-accent/10" : "border-line bg-white"}`}
+          >
+            {section.short}
+          </button>
+        ))}
       </div>
+      {open === "auditar" ? <AuditPanel /> : null}
+      {open === "datos" ? (
+        <DatosPanel mode="open" readOnly={auditor} params={params} setParams={setParams} onSubmit={saveParams} error={error} message={message} />
+      ) : null}
+      {open === "ninos" ? <Children mode="open" readOnly={auditor} rows={childRows} setRows={setChildRows} /> : null}
+      {open === "auditores" ? <Auditors mode="open" rows={auditorRows} setRows={setAuditorRows} /> : null}
+      {open === "tips" ? <FamilyTips mode="open" initialTips={tips} /> : null}
     </div>
+  );
+}
+
+function AuditPanel() {
+  return (
+    <OpenCard id="auditar" title="Movimientos">
+      <TaskReview />
+    </OpenCard>
   );
 }
 
@@ -385,25 +544,20 @@ function PreviewCard({ title, onOpen, children }: { title: string; onOpen: () =>
   );
 }
 
-function OpenCard({ id, title, onClose, hint, children }: { id: SectionId; title: string; onClose: () => void; hint?: string; children: ReactNode }) {
+function OpenCard({ id, title, hint, children }: { id: SectionId; title: string; hint?: string; children: ReactNode }) {
   return (
     <section id={`panel-${id}`} className="scroll-mt-36 rounded-3xl border border-line bg-card p-5 sm:p-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-serif text-3xl">{title}</h2>
-        <button type="button" onClick={onClose} className="rounded-xl px-3 py-2 text-sm font-bold text-muted">
-          Cerrar
-        </button>
-      </div>
+      <h2 className="font-serif text-3xl">{title}</h2>
       {hint ? <p className="mt-1 text-sm text-muted">{hint}</p> : null}
       <div className="mt-4">{children}</div>
     </section>
   );
 }
 
-function MiniStat({ label, value, wide }: { label: string; value: string; wide?: boolean }) {
+function MiniStat({ label, value, wide }: { label?: string; value: string; wide?: boolean }) {
   return (
     <span className={`rounded-2xl border border-line bg-white px-3 py-2 ${wide ? "col-span-2" : ""}`}>
-      <span className="block text-xs text-muted">{label}</span>
+      {label ? <span className="block text-xs text-muted">{label}</span> : null}
       <span className="block truncate font-bold">{value}</span>
     </span>
   );
@@ -416,7 +570,7 @@ function MiniButton({
   dashed,
   active,
 }: {
-  label: string;
+  label?: string;
   value: string;
   onClick: () => void;
   dashed?: boolean;
@@ -426,9 +580,9 @@ function MiniButton({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded-2xl border px-3 py-3 text-left hover:border-accent ${dashed ? "border-dashed border-accent/50 bg-white" : active ? "border-accent bg-accent/10" : "border-line bg-white"}`}
+      className={`h-full w-full rounded-2xl border px-3 py-3 text-left hover:border-accent ${dashed ? "border-dashed border-accent/50 bg-white" : active ? "border-accent bg-accent/10" : "border-line bg-white"}`}
     >
-      <span className="block truncate text-xs text-muted">{label}</span>
+      {label ? <span className="block truncate text-xs text-muted">{label}</span> : null}
       <span className="block truncate font-serif text-xl">{value}</span>
     </button>
   );
@@ -436,6 +590,7 @@ function MiniButton({
 
 function DatosPanel({
   mode,
+  readOnly = false,
   onToggle,
   params,
   setParams,
@@ -444,7 +599,8 @@ function DatosPanel({
   message,
 }: {
   mode: "preview" | "open";
-  onToggle: () => void;
+  readOnly?: boolean;
+  onToggle?: () => void;
   params: FamilyDetail;
   setParams: (params: FamilyDetail) => void;
   onSubmit: (event: FormEvent) => void;
@@ -453,18 +609,30 @@ function DatosPanel({
 }) {
   if (mode === "preview") {
     return (
-      <PreviewCard title="Datos generales" onOpen={onToggle}>
+      <PreviewCard title="Datos generales" onOpen={onToggle ?? (() => {})}>
         <MiniStat wide label="Familia" value={params.name || "Sin nombre"} />
         <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
         <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
         <MiniStat label="Donaciones" value={`${params.pctDonaciones}%`} />
-        <MiniStat label="Interés" value={`${params.interestPercent}%`} />
       </PreviewCard>
     );
   }
 
+  if (readOnly) {
+    return (
+      <OpenCard id="datos" title="Datos generales">
+        <div className="grid grid-cols-2 gap-2">
+          <MiniStat wide label="Familia" value={params.name || "Sin nombre"} />
+          <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
+          <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
+          <MiniStat label="Donaciones" value={`${params.pctDonaciones}%`} />
+        </div>
+      </OpenCard>
+    );
+  }
+
   return (
-    <OpenCard id="datos" title="Datos generales" onClose={onToggle}>
+    <OpenCard id="datos" title="Datos generales">
       <form onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Input label="Nombre de la familia" value={params.name} onChange={(value) => setParams({ ...params, name: value })} />
@@ -473,7 +641,6 @@ function DatosPanel({
         <Input label="Inversión %" type="number" value={String(params.pctInversion)} onChange={(value) => setParams({ ...params, pctInversion: Number(value) })} />
         <Input label="Gasto %" type="number" value={String(params.pctGasto)} onChange={(value) => setParams({ ...params, pctGasto: Number(value) })} />
         <Input label="Donaciones %" type="number" value={String(params.pctDonaciones)} onChange={(value) => setParams({ ...params, pctDonaciones: Number(value) })} />
-        <Input label="Interés mensual %" type="number" value={String(params.interestPercent)} onChange={(value) => setParams({ ...params, interestPercent: Number(value) })} />
         {error ? <p className="text-sm text-red-700 sm:col-span-2">{error}</p> : null}
         {message ? <p className="text-sm text-accent sm:col-span-2">{message}</p> : null}
         <button className="rounded-2xl bg-accent px-4 py-3 font-bold text-white sm:col-span-2">Guardar parámetros</button>
@@ -484,7 +651,6 @@ function DatosPanel({
 
 function NewChild({ onCreated, onCancel }: { onCreated: (child: ChildItem) => void; onCancel: () => void }) {
   const [name, setName] = useState("");
-  const [gender, setGender] = useState<"nino" | "nina">("nino");
   const [birthDate, setBirthDate] = useState("");
   const [loginId, setLoginId] = useState("");
   const [pin, setPin] = useState("");
@@ -497,7 +663,7 @@ function NewChild({ onCreated, onCancel }: { onCreated: (child: ChildItem) => vo
     const res = await fetch("/api/children", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, gender, birthDate, loginId, pin }),
+      body: JSON.stringify({ name, birthDate, loginId, pin }),
     });
     const data = (await res.json().catch(() => null)) as { error?: string; child?: ChildItem } | null;
     if (!res.ok || !data?.child) {
@@ -521,13 +687,6 @@ function NewChild({ onCreated, onCancel }: { onCreated: (child: ChildItem) => vo
       </div>
       <form onSubmit={onSubmit} className="mt-4 grid gap-3">
         <Input label="Nombre" value={name} onChange={setName} />
-        <label className="text-sm">
-          Niño o niña
-          <select value={gender} onChange={(event) => setGender(event.target.value as "nino" | "nina")} className="mt-1.5 w-full rounded-2xl border border-line px-4 py-3">
-            <option value="nino">Niño</option>
-            <option value="nina">Niña</option>
-          </select>
-        </label>
         <Input label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} />
         <Input label="Nombre en la casa" value={loginId} onChange={setLoginId} />
         <PinField label="PIN de 6 números" value={pin} onChange={setPin} />
@@ -603,7 +762,7 @@ function useToast() {
 function Notice({ message }: { message: string }) {
   if (!message) return null;
   return (
-    <p role="status" className="fixed bottom-6 left-1/2 z-50 max-w-sm -translate-x-1/2 rounded-2xl bg-foreground px-5 py-3 text-center text-sm font-bold text-background shadow-lg">
+    <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
       {message}
     </p>
   );
@@ -613,12 +772,14 @@ function Children({
   rows,
   setRows,
   mode,
+  readOnly = false,
   onToggle,
 }: {
   rows: ChildItem[];
   setRows: (update: (rows: ChildItem[]) => ChildItem[]) => void;
   mode: "preview" | "open";
-  onToggle: () => void;
+  readOnly?: boolean;
+  onToggle?: () => void;
 }) {
   const [toast, setToast] = useToast();
   const [selected, setSelected] = useState<string | null>(null);
@@ -630,9 +791,9 @@ function Children({
 
   if (mode === "preview") {
     return (
-      <PreviewCard title="Niños" onOpen={onToggle}>
+      <PreviewCard title="Niños" onOpen={onToggle ?? (() => {})}>
         {shown.map((child) => (
-          <MiniStat key={child.id} wide={shown.length === 1} label={child.gender === "nina" ? "Niña" : "Niño"} value={child.name} />
+          <MiniStat key={child.id} wide={shown.length === 1} value={child.name} />
         ))}
         {rows.length > shown.length ? <MiniStat label="Más" value={`+${rows.length - shown.length}`} /> : null}
         {rows.length === 0 ? <span className="col-span-2 text-sm text-muted">Todavía no hay niños.</span> : null}
@@ -641,26 +802,15 @@ function Children({
   }
 
   return (
-    <OpenCard id="ninos" title="Niños" onClose={onToggle} hint="Toca una tarjeta para verla en grande.">
+    <OpenCard id="ninos" title="Niños" hint={readOnly ? undefined : "Toca una tarjeta para verla en grande."}>
       <ul className="grid grid-cols-2 gap-2">
-        <li className="col-span-2">
-          {selected === "new" ? (
-            <NewChild
-              onCancel={() => setSelected(null)}
-              onCreated={(child) => {
-                setRows((current) => [...current, child]);
-                setSelected(child.id);
-              }}
-            />
-          ) : (
-            <MiniButton dashed label="Sumar" value="Nuevo niño" onClick={() => setSelected("new")} />
-          )}
-        </li>
+        {rows.length === 0 ? <li className="col-span-2 text-sm text-muted">Todavía no hay niños.</li> : null}
         {rows.map((child) => (
-          <li key={child.id} className={selected === child.id ? "col-span-2" : ""}>
+          <li key={child.id} className={selected === child.id ? "col-span-2" : "grid"}>
             {selected === child.id ? (
               <ChildCard
                 child={child}
+                readOnly={readOnly}
                 onCollapse={() => setSelected(null)}
                 onSaved={(next) => {
                   setRows((current) => current.map((row) => (row.id === next.id ? next : row)));
@@ -673,30 +823,293 @@ function Children({
                 }}
               />
             ) : (
-              <MiniButton label={child.gender === "nina" ? "Niña" : "Niño"} value={child.name} onClick={() => setSelected(child.id)} />
+              <MiniButton value={child.name} onClick={() => setSelected(child.id)} />
             )}
           </li>
         ))}
+        {readOnly ? null : (
+          <li className={selected === "new" ? "col-span-2" : "grid"}>
+            {selected === "new" ? (
+              <NewChild
+                onCancel={() => setSelected(null)}
+                onCreated={(child) => {
+                  setRows((current) => [...current, child]);
+                  setSelected(child.id);
+                }}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-line bg-white px-3 py-3">
+                <button type="button" onClick={() => setSelected("new")} className="rounded-full border border-foreground/15 bg-background px-6 py-2.5 font-serif text-xl shadow-sm">
+                  Nuevo niño
+                </button>
+              </div>
+            )}
+          </li>
+        )}
       </ul>
       <Notice message={toast} />
     </OpenCard>
   );
 }
 
+type ChildCartolaView = {
+  pendingCount: number;
+  pendingSum: number;
+  withdrawalPendingCount: number;
+  withdrawalPendingSum: number;
+  wallets: {
+    type: "inversion" | "gasto" | "donaciones";
+    availableMinor: number;
+    earned12mMinor: number;
+    withdrawn12mMinor: number;
+  }[];
+};
+
+const WALLET_LABELS = {
+  inversion: "Inversión",
+  gasto: "Gasto",
+  donaciones: "Donaciones",
+} as const;
+
+function pesos(amount: number) {
+  return `$${amount.toLocaleString("es-CL")}`;
+}
+
+function ChildCartola({ childId, childName, canCredit }: { childId: string; childName: string; canCredit: boolean }) {
+  const [cartola, setCartola] = useState<ChildCartolaView | null>(null);
+  const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [crediting, setCrediting] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    let active = true;
+    setCartola(null);
+    setError("");
+    fetch(`/api/children/${childId}`)
+      .then(async (res) => {
+        const data = (await res.json().catch(() => null)) as { cartola?: ChildCartolaView; error?: string } | null;
+        if (!active) return;
+        if (!res.ok || !data?.cartola) {
+          setError(data?.error ?? "No se pudo cargar la cartola.");
+          return;
+        }
+        setCartola(data.cartola);
+      })
+      .catch(() => {
+        if (active) setError("No se pudo cargar la cartola.");
+      });
+    return () => {
+      active = false;
+    };
+  }, [childId, reloadKey]);
+
+  if (error) return <p className="mt-4 text-sm text-red-700">{error}</p>;
+  if (!cartola) {
+    return (
+      <div className="mt-4 grid gap-2" aria-busy="true" aria-live="polite">
+        <div className="h-14 animate-pulse rounded-2xl border border-line bg-background/80" />
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="h-36 animate-pulse rounded-2xl border border-line bg-background/80" />
+          <div className="h-36 animate-pulse rounded-2xl border border-line bg-background/80" />
+          <div className="h-36 animate-pulse rounded-2xl border border-line bg-background/80" />
+        </div>
+      </div>
+    );
+  }
+
+  const tipLabel =
+    cartola.pendingCount === 0 ? "Nada por revisar" : cartola.pendingCount === 1 ? "1 tip" : `${cartola.pendingCount} tips`;
+  const cashLabel =
+    cartola.withdrawalPendingCount === 0
+      ? "Sin pedidos"
+      : cartola.withdrawalPendingCount === 1
+        ? "1 pedido"
+        : `${cartola.withdrawalPendingCount} pedidos`;
+
+  return (
+    <div className="mt-4 grid gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-2xl border border-line bg-background/70 px-3 py-3">
+          <p className="text-xs text-muted">Tips pendientes</p>
+          <p className="mt-1 font-serif text-2xl leading-none">{pesos(cartola.pendingSum)}</p>
+          <p className="mt-1.5 text-xs font-bold text-muted">{tipLabel}</p>
+        </div>
+        <div className="rounded-2xl border border-line bg-background/70 px-3 py-3">
+          <p className="text-xs text-muted">Por entregar</p>
+          <p className="mt-1 font-serif text-2xl leading-none">{pesos(cartola.withdrawalPendingSum)}</p>
+          <p className="mt-1.5 text-xs font-bold text-muted">{cashLabel}</p>
+        </div>
+      </div>
+      <ul className="grid gap-2 sm:grid-cols-3">
+        {cartola.wallets.map((wallet) => (
+          <li key={wallet.type} className="rounded-2xl border border-line bg-white px-3 py-3">
+            <p className="text-xs font-bold text-accent">{WALLET_LABELS[wallet.type]}</p>
+            <p className="mt-2 text-[11px] text-muted">Disponible</p>
+            <p className="font-serif text-3xl leading-none">{pesos(wallet.availableMinor)}</p>
+            <div className="mt-3 grid grid-cols-2 gap-2 border-t border-line/80 pt-3">
+              <div>
+                <p className="text-[11px] text-muted">{wallet.type === "inversion" ? "Intereses 12 m" : "Ganado 12 m"}</p>
+                <p className="font-serif text-lg leading-none">{pesos(wallet.earned12mMinor)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted">Retiros 12 m</p>
+                <p className="font-serif text-lg leading-none">{pesos(wallet.withdrawn12mMinor)}</p>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+      {canCredit ? (
+        <button type="button" onClick={() => setCrediting(true)} className="rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm font-bold text-accent">
+          Abonar intereses
+        </button>
+      ) : null}
+      {crediting ? (
+        <InteresesModal
+          childId={childId}
+          childName={childName}
+          onClose={() => setCrediting(false)}
+          onDone={(amount) => {
+            setCrediting(false);
+            setReloadKey((key) => key + 1);
+            setToast(`Intereses de ${pesos(amount)} abonados a Inversión.`);
+          }}
+        />
+      ) : null}
+      {toast ? (
+        <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
+          {toast}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function InteresesModal({
+  childId,
+  childName,
+  onClose,
+  onDone,
+}: {
+  childId: string;
+  childName: string;
+  onClose: () => void;
+  onDone: (amount: number) => void;
+}) {
+  const [amount, setAmount] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    const value = Number(amount);
+    if (!Number.isInteger(value) || value <= 0) {
+      setError("El monto tiene que ser un número entero mayor que cero.");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/rentabilidad", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ childId, amountMinor: value }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setError(data?.error ?? "No se pudo abonar los intereses.");
+        return;
+      }
+      onDone(value);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
+      <form
+        noValidate
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="abonar-intereses"
+        className="relative w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={submit}
+      >
+        {busy ? <div className="absolute inset-0 z-10 rounded-3xl bg-white/55" aria-busy="true" /> : null}
+        <div className="flex items-start justify-between gap-3">
+          <h2 id="abonar-intereses" className="font-serif text-3xl">
+            Abonar intereses
+          </h2>
+          <button type="button" disabled={busy} onClick={onClose} className="text-sm font-bold text-muted disabled:opacity-50" aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          Se suma a la Inversión de {childName}. Es tu decisión como banquero.
+        </p>
+        <label className="mt-5 block text-sm">
+          Monto
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            value={amount}
+            onChange={(event) => {
+              setError("");
+              setAmount(event.target.value.replace(/\D/g, ""));
+            }}
+            className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 ${error ? "border-red-700" : "border-line"}`}
+          />
+        </label>
+        {error ? (
+          <p role="alert" className="mt-3 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-6 grid grid-cols-2 gap-2">
+          <button type="submit" disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+            {busy ? "Abonando…" : "Continuar"}
+          </button>
+          <button type="button" disabled={busy} onClick={onClose} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ChildCard({
   child,
+  readOnly = false,
   onSaved,
   onRemoved,
   onCollapse,
 }: {
   child: ChildItem;
+  readOnly?: boolean;
   onSaved: (child: ChildItem) => void;
   onRemoved: (name: string) => void;
   onCollapse: () => void;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "baja">("view");
   const [name, setName] = useState(child.name);
-  const [gender, setGender] = useState(child.gender);
   const [birthDate, setBirthDate] = useState(child.birthDate);
   const [loginId, setLoginId] = useState(child.loginId);
   const [pin, setPin] = useState("");
@@ -706,7 +1119,6 @@ function ChildCard({
 
   function beginEdit() {
     setName(child.name);
-    setGender(child.gender);
     setBirthDate(child.birthDate);
     setLoginId(child.loginId);
     setPin("");
@@ -729,7 +1141,7 @@ function ChildCard({
       const res = await fetch(`/api/children/${child.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, gender, birthDate, loginId, pin }),
+        body: JSON.stringify({ name, birthDate, loginId, pin }),
       });
       const data = (await res.json().catch(() => null)) as { error?: string; child?: ChildItem } | null;
       if (!res.ok || !data?.child) {
@@ -775,13 +1187,6 @@ function ChildCard({
       {mode === "edit" ? (
         <div className="grid gap-3">
           <Input label="Nombre" value={name} onChange={setName} />
-          <label className="text-sm">
-            Niño o niña
-            <select value={gender} onChange={(event) => setGender(event.target.value as "nino" | "nina")} className="mt-1.5 w-full rounded-2xl border border-line px-4 py-3">
-              <option value="nino">Niño</option>
-              <option value="nina">Niña</option>
-            </select>
-          </label>
           <Input label="Fecha de nacimiento" type="date" value={birthDate} onChange={setBirthDate} />
           <Input label="Nombre en la casa" value={loginId} onChange={setLoginId} />
           <PinField label="PIN nuevo, si lo cambias" value={pin} onChange={setPin} />
@@ -789,45 +1194,47 @@ function ChildCard({
       ) : (
         <>
           <p className="font-serif text-2xl">{child.name}</p>
-          <p className="mt-1 text-sm font-bold text-accent">{child.gender === "nina" ? "Niña" : "Niño"}</p>
           <p className="mt-3 text-sm">
             En casa, <span className="font-bold">{child.loginId}</span>
           </p>
           {born ? <p className="mt-1 text-sm text-muted">{born}</p> : null}
+          {mode === "view" ? <ChildCartola childId={child.id} childName={child.name} canCredit={!readOnly} /> : null}
         </>
       )}
       {mode === "baja" ? <p className="mt-3 text-sm">{child.name} deja de poder entrar. Su libro se queda.</p> : null}
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
-      <div className="mt-4 grid grid-cols-2 gap-2">
-        {mode === "edit" ? (
-          <>
-            <button type="button" disabled={busy || !pinChangeOk} onClick={save} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
-              {busy ? "Guardando…" : "Guardar"}
-            </button>
-            <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
-              Cancelar
-            </button>
-          </>
-        ) : mode === "baja" ? (
-          <>
-            <button type="button" disabled={busy} onClick={confirmBaja} className="rounded-2xl bg-red-800 px-4 py-3 font-bold text-white disabled:opacity-50">
-              {busy ? "Dando de baja…" : "Confirmar baja"}
-            </button>
-            <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
-              Cancelar
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={beginEdit} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold">
-              Modificar
-            </button>
-            <button type="button" onClick={() => { setError(""); setMode("baja"); }} className="rounded-2xl border border-red-800/30 px-4 py-3 font-bold text-red-800">
-              Baja
-            </button>
-          </>
-        )}
-      </div>
+      {readOnly ? null : (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          {mode === "edit" ? (
+            <>
+              <button type="button" disabled={busy || !pinChangeOk} onClick={save} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Guardando…" : "Guardar"}
+              </button>
+              <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+                Cancelar
+              </button>
+            </>
+          ) : mode === "baja" ? (
+            <>
+              <button type="button" disabled={busy} onClick={confirmBaja} className="rounded-2xl bg-red-800 px-4 py-3 font-bold text-white disabled:opacity-50">
+                {busy ? "Dando de baja…" : "Confirmar baja"}
+              </button>
+              <button type="button" disabled={busy} onClick={cancel} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={beginEdit} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold">
+                Modificar
+              </button>
+              <button type="button" onClick={() => { setError(""); setMode("baja"); }} className="rounded-2xl border border-red-800/30 px-4 py-3 font-bold text-red-800">
+                Baja
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -841,7 +1248,7 @@ function Auditors({
   rows: AuditorItem[];
   setRows: (update: (rows: AuditorItem[]) => AuditorItem[]) => void;
   mode: "preview" | "open";
-  onToggle: () => void;
+  onToggle?: () => void;
 }) {
   const [toast, setToast] = useToast();
   const [selected, setSelected] = useState<string | null>(null);
@@ -853,7 +1260,7 @@ function Auditors({
 
   if (mode === "preview") {
     return (
-      <PreviewCard title="Auditores" onOpen={onToggle}>
+      <PreviewCard title="Auditores" onOpen={onToggle ?? (() => {})}>
         {shown.map((auditor) => (
           <MiniStat key={auditor.id} wide={shown.length === 1} label={auditor.email} value={auditor.name} />
         ))}
@@ -864,7 +1271,7 @@ function Auditors({
   }
 
   return (
-    <OpenCard id="auditores" title="Auditores" onClose={onToggle} hint="Toca una tarjeta para verla en grande.">
+    <OpenCard id="auditores" title="Auditores" hint="Toca una tarjeta para verla en grande.">
       <ul className="grid grid-cols-2 gap-2">
         <li className="col-span-2">
           {selected === "new" ? (

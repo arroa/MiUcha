@@ -33,7 +33,7 @@ function rowsFromTips(initialTips: TipView[]): Row[] {
   return [...catalog, ...custom];
 }
 
-export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipView[]; mode: "preview" | "open"; onToggle: () => void }) {
+export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipView[]; mode: "preview" | "open"; onToggle?: () => void }) {
   const [rows, setRows] = useState<Row[]>(() => rowsFromTips(initialTips));
   const [picked, setPicked] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
@@ -58,6 +58,37 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
 
   function update(key: string, patch: Partial<Row>) {
     setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+  }
+
+  async function toggleActive(row: Row, active: boolean) {
+    if (row.editing) {
+      update(row.key, { active });
+      return;
+    }
+    const previous = row.active;
+    update(row.key, { active });
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/tips", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: [{ key: row.key, title: row.title, amountMinor: Number(row.amount), active }],
+        }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string; tips?: TipView[] } | null;
+      const tips = data?.tips;
+      if (!res.ok || !tips) {
+        update(row.key, { active: previous });
+        setError(data?.error ?? "No se pudo guardar la tarea.");
+        return;
+      }
+      setRows((current) => (current.some((item) => item.editing) ? current : rowsFromTips(tips)));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function edit(key: string) {
@@ -163,7 +194,7 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
 
   if (mode === "preview") {
     return (
-      <button type="button" onClick={onToggle} className="flex h-full w-full flex-col rounded-3xl border border-line bg-card p-4 text-left hover:border-accent">
+      <button type="button" onClick={onToggle ?? (() => {})} className="flex h-full w-full flex-col rounded-3xl border border-line bg-card p-4 text-left hover:border-accent">
         <span className="flex items-baseline justify-between gap-3">
           <span className="font-serif text-2xl">Tips</span>
           <span className="text-sm font-bold text-accent">Abrir</span>
@@ -190,12 +221,7 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
 
   return (
     <section id="panel-tips" className="scroll-mt-36 rounded-3xl border border-line bg-card p-5 sm:p-6">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-serif text-3xl">Tips</h2>
-        <button type="button" onClick={onToggle} className="rounded-xl px-3 py-2 text-sm font-bold text-muted">
-          Cerrar
-        </button>
-      </div>
+      <h2 className="font-serif text-3xl">Tips</h2>
       <p className="mt-1 text-sm text-muted">{activeCount === 1 ? "1 activa" : `${activeCount} activas`}.</p>
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
@@ -239,8 +265,8 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
                   <input
                     type="checkbox"
                     checked={row.active}
-                    disabled={!row.editing}
-                    onChange={(event) => update(row.key, { active: event.target.checked })}
+                    disabled={busy}
+                    onChange={(event) => toggleActive(row, event.target.checked)}
                     className="size-5 accent-accent disabled:opacity-100"
                   />
                   Activa
