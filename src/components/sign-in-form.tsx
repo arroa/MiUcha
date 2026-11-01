@@ -12,6 +12,16 @@ function isEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function clerkErrorMessage(error: unknown): string {
+  if (!error || typeof error !== "object") return "";
+  const errors = (error as { errors?: { longMessage?: string; message?: string; code?: string }[] }).errors;
+  if (errors?.length) {
+    return errors.map((item) => item.longMessage ?? item.message ?? item.code).filter(Boolean).join("; ");
+  }
+  if (error instanceof Error) return error.message;
+  return "";
+}
+
 export function SignInForm({ devBypass, clerkEnabled }: Props) {
   if (devBypass) return <DevForm />;
   if (clerkEnabled) return <ClerkForm />;
@@ -143,13 +153,13 @@ function ClerkForm() {
       const result = await signIn.create({ identifier: email.trim().toLowerCase() });
       const factor = result.supportedFirstFactors?.find((item) => item.strategy === "email_code");
       if (!factor || !("emailAddressId" in factor)) {
-        setError("Activa el código por email en Clerk.");
+        setError("Activa el código por email en Clerk (Email verification code).");
         return;
       }
       await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
       setStep("code");
-    } catch {
-      setError("No se pudo iniciar sesión.");
+    } catch (err) {
+      setError(clerkErrorMessage(err) || "No se pudo iniciar sesión.");
     } finally {
       setLoading(false);
     }
@@ -171,8 +181,8 @@ function ClerkForm() {
         return;
       }
       setError("No se pudo completar el acceso.");
-    } catch {
-      setError("Código inválido o expirado.");
+    } catch (err) {
+      setError(clerkErrorMessage(err) || "Código inválido o expirado.");
     } finally {
       setLoading(false);
     }

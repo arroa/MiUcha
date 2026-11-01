@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, Nunito } from "next/font/google";
 
 import { ClerkRoot } from "@/components/clerk-root";
@@ -13,10 +13,6 @@ export const metadata: Metadata = {
   description: "Mi dinero. Mis decisiones.",
   applicationName: "MiHucha",
   manifest: "/manifest.webmanifest",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#7b2cbf" },
-    { media: "(prefers-color-scheme: dark)", color: "#7b2cbf" },
-  ],
   appleWebApp: {
     capable: true,
     title: "MiHucha",
@@ -33,6 +29,13 @@ export const metadata: Metadata = {
   other: {
     "mobile-web-app-capable": "yes",
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#7b2cbf" },
+    { media: "(prefers-color-scheme: dark)", color: "#7b2cbf" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
