@@ -19,7 +19,6 @@ function isPublic(pathname: string) {
     pathname === "/" ||
     pathname.startsWith("/sign-in") ||
     pathname === "/entrar" ||
-    pathname.startsWith("/prototipos") ||
     pathname.startsWith("/api/auth/dev-login") ||
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
