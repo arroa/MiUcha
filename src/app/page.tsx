@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { PwaInstallButton } from "@/components/pwa-install";
+
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-full max-w-3xl flex-col justify-center px-6 py-20">
@@ -13,6 +15,7 @@ export default function Home() {
         <Link href="/sign-in" className="rounded-2xl border border-line bg-card px-6 py-4 font-bold">
           Soy adulto
         </Link>
+        <PwaInstallButton />
       </div>
     </main>
   );

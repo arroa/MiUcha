@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Fraunces, Nunito } from "next/font/google";
 
 import { ClerkRoot } from "@/components/clerk-root";
+import { PwaRegister } from "@/components/pwa-install";
 
 import "./globals.css";
 
@@ -42,7 +43,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <ClerkRoot>
       <html lang="es" className={`${nunito.variable} ${fraunces.variable} h-full antialiased`}>
-        <body className="min-h-full font-sans">{children}</body>
+        <body className="min-h-full font-sans">
+          <PwaRegister />
+          {children}
+        </body>
       </html>
     </ClerkRoot>
   );
