@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
+import { Suspense } from "react";
 
 import { ChildShell } from "@/components/child-shell";
 import { GoalDetailActions } from "@/components/goal-detail-actions";
@@ -15,7 +16,15 @@ function pesos(amount: number) {
 
 type Params = { params: Promise<{ id: string }> };
 
-export default async function ObjetivoDetallePage({ params }: Params) {
+export default function ObjetivoDetallePage({ params }: Params) {
+  return (
+    <Suspense fallback={<p className="yo-soft p-8 text-muted">Cargando…</p>}>
+      <ObjetivoDetalle params={params} />
+    </Suspense>
+  );
+}
+
+async function ObjetivoDetalle({ params }: Params) {
   const child = await getChildSession();
   if (!child) redirect("/entrar");
   const { id } = await params;

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Plus, Star } from "lucide-react";
+import { Suspense } from "react";
 
 import { ChildShell } from "@/components/child-shell";
 import { getChildSession } from "@/lib/child-account";
@@ -11,7 +12,15 @@ function pesos(amount: number) {
   return `$${amount.toLocaleString("es-CL")}`;
 }
 
-export default async function ObjetivosPage() {
+export default function ObjetivosPage() {
+  return (
+    <Suspense fallback={<p className="yo-soft p-8 text-muted">Cargando…</p>}>
+      <Objetivos />
+    </Suspense>
+  );
+}
+
+async function Objetivos() {
   const child = await getChildSession();
   if (!child) redirect("/entrar");
 
