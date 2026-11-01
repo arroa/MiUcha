@@ -164,7 +164,7 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
   return (
     <section className="yo-rise-1 flex h-full flex-col rounded-[1.75rem] bg-card p-5 shadow-[0_12px_40px_rgba(109,76,255,0.12)]">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-2xl font-extrabold leading-tight">Mis Uchas</h2>
+        <h2 className="text-2xl font-extrabold leading-tight">Mis Huchas</h2>
         <button
           type="button"
           disabled={busyLock || (gasto?.availableMinor ?? 0) <= 0}
@@ -228,7 +228,7 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
 
       {error && !action ? <p className="text-sm text-red-700">{error}</p> : null}
       {toast ? (
-        <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
+        <p role="status" className="mihucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
           {toast}
         </p>
       ) : null}

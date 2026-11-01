@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 
-export const FAMILY_COOKIE = "miucha_familia";
+export const FAMILY_COOKIE = "mihucha_familia";
 
 export async function readFamilyChoice(): Promise<string | null> {
   const jar = await cookies();

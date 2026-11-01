@@ -1,4 +1,4 @@
-/** Etiquetas UI de Uchas. Seguro para client components (sin Mongo/headers). */
+/** Etiquetas UI de Huchas. Seguro para client components (sin Mongo/headers). */
 
 export type WalletType = "inversion" | "gasto" | "donaciones";
 

@@ -126,7 +126,7 @@ export function GoalDetailActions({ goal, wallets }: { goal: GoalView; wallets: 
       ) : null}
 
       {toast ? (
-        <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
+        <p role="status" className="mihucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
           {toast}
         </p>
       ) : null}

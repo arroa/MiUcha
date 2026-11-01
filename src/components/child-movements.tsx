@@ -10,7 +10,7 @@ export function ChildMovements({ rows }: { rows: ChildMovement[] }) {
   return (
     <section className="yo-rise-3">
       <h3 className="text-2xl font-extrabold leading-tight">Qué pasó con mi plata</h3>
-      <p className="mt-0.5 text-sm text-muted">Tus movimientos de Uchas.</p>
+      <p className="mt-0.5 text-sm text-muted">Tus movimientos de Huchas.</p>
       {rows.length === 0 ? (
         <div className="mt-4 rounded-3xl border border-dashed border-line bg-card px-5 py-8 text-center">
           <p className="text-xl font-extrabold">Todavía vacía</p>

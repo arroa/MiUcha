@@ -1,6 +1,6 @@
 # Specs
 
-Ideas de MiUcha, ya ubicadas.
+Ideas de MiHucha, ya ubicadas.
 
 | Documento | Pregunta que responde |
 | --- | --- |

@@ -1,8 +1,8 @@
 # DataBase
 
-Modelo de MiUcha. Motor: MongoDB Atlas. Conexión: `MONGODB_URI`. Base: `MONGODB_DB_NAME`. Cliente en `src/lib/mongodb.ts`.
+Modelo de MiHucha. Motor: MongoDB Atlas. Conexión: `MONGODB_URI`. Base: `MONGODB_DB_NAME`. Cliente en `src/lib/mongodb.ts`.
 
-El libro de movimientos es la fuente auditable. El saldo de cada Ucha es la proyección, y se actualiza en la misma transacción que el asiento. Los montos son pesos enteros (`amountMinor`, `balanceMinor`).
+El libro de movimientos es la fuente auditable. El saldo de cada Hucha es la proyección, y se actualiza en la misma transacción que el asiento. Los montos son pesos enteros (`amountMinor`, `balanceMinor`).
 
 ## Diagrama
 
@@ -69,7 +69,7 @@ Hay un banquero activo por familia.
 | `active` | Si puede entrar. Desactivarlo no borra el libro |
 | `createdAt` | Alta |
 
-Al crear un niño se crean sus tres Uchas en cero.
+Al crear un niño se crean sus tres Huchas en cero.
 
 ## wallets
 
@@ -130,7 +130,7 @@ Asiento que no se edita ni se borra.
 | --- | --- |
 | `familyId` | Familia |
 | `childId` | Niño |
-| `walletType` | Ucha |
+| `walletType` | Hucha |
 | `amountMinor` | Pesos con signo. Entra positivo, sale negativo |
 | `kind` | `tip`, `transfer`, `withdrawal`, `interest`, `reversal` |
 | `operationId` | Clave de idempotencia |
@@ -149,7 +149,7 @@ Las claves estables son:
 | Transferencia | `transfer:<id nuevo>` |
 | Reversa | `reversal:<id nuevo>` |
 
-Aprobar un Tip escribe tres asientos, uno por Ucha, con el mismo `operationId` y distinto `walletType`. El interés escribe uno, en `inversion`.
+Aprobar un Tip escribe tres asientos, uno por Hucha, con el mismo `operationId` y distinto `walletType`. El interés escribe uno, en `inversion`.
 
 Lo ahorrado en el mes, para esa tasa, es la suma de asientos de `inversion` de ese mes cuyos `kind` son `tip` o `transfer`, más los `withdrawal` negativos. Si el neto no es positivo, no hay asiento de interés.
 
@@ -161,7 +161,7 @@ Pedido de plata. El saldo no baja hasta `completed`.
 | --- | --- |
 | `familyId` | Familia |
 | `childId` | Niño |
-| `walletType` | Desde qué Ucha |
+| `walletType` | Desde qué Hucha |
 | `amountMinor` | Pesos pedidos |
 | `note` | Para qué, opcional. En Donaciones puede decir a quién ayudó |
 | `status` | `pending`, `completed` o `cancelled` |
@@ -169,7 +169,7 @@ Pedido de plata. El saldo no baja hasta `completed`.
 | `completedAt` | Entrega |
 | `banqueroId` | Quién marcó la entrega |
 
-Los `pending` del niño y la Ucha cuentan contra el saldo disponible.
+Los `pending` del niño y la Hucha cuentan contra el saldo disponible.
 
 ## child_sessions
 

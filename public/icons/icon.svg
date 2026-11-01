@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="113" fill="#f4f0ff"/>
-  <circle cx="256" cy="256" r="174.16799999999998" fill="#ffffff"/>
-  <circle cx="256" cy="256" r="147.6" fill="#6d4cff"/>
-  <circle cx="256" cy="256" r="115.128" fill="none" stroke="#ffffff" stroke-width="9.216" opacity="0.55"/>
-  <text x="256" y="307.48" text-anchor="middle" font-family="Nunito, Segoe UI, Arial, sans-serif" font-size="143" font-weight="800" fill="#ffffff">M</text>
-  <circle cx="362.272" cy="149.728" r="23.616" fill="#a78bfa" opacity="0.9"/>
-</svg>

@@ -1,7 +1,7 @@
 import { MongoClient, type Db } from "mongodb";
 
 declare global {
-  var _miuchaMongo: Promise<MongoClient> | undefined;
+  var _mihuchaMongo: Promise<MongoClient> | undefined;
 }
 
 let clientPromise: Promise<MongoClient> | undefined;
@@ -14,8 +14,8 @@ function mongoUri() {
 
 export function getMongoClient(): Promise<MongoClient> {
   if (process.env.NODE_ENV === "development") {
-    global._miuchaMongo ??= new MongoClient(mongoUri()).connect();
-    return global._miuchaMongo;
+    global._mihuchaMongo ??= new MongoClient(mongoUri()).connect();
+    return global._mihuchaMongo;
   }
   clientPromise ??= new MongoClient(mongoUri()).connect();
   return clientPromise;

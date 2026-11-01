@@ -1,6 +1,6 @@
 # Integration
 
-Qué habla MiUcha con el exterior, y las APIs propias. El motivo de cada operación está en [Funcional](./Funcional.docx). Lo que queda guardado está en [DataBase](./DataBase.md).
+Qué habla MiHucha con el exterior, y las APIs propias. El motivo de cada operación está en [Funcional](./Funcional.docx). Lo que queda guardado está en [DataBase](./DataBase.md).
 
 No hay banco ni pasarela. La entrega de plata ocurre fuera de la aplicación. El banquero la confirma aquí.
 
@@ -23,7 +23,7 @@ El niño no pasa por Clerk.
 | Iniciar sesión | El adulto pide el código a su correo y entra por `/sign-in` |
 | Borrar usuario | Baja de un auditor, o de un banquero si el superusuario cierra esa puerta |
 
-La membresía y el rol viven en MiUcha, no en atributos editables de Clerk.
+La membresía y el rol viven en MiHucha, no en atributos editables de Clerk.
 
 ## MongoDB Atlas
 
@@ -47,7 +47,7 @@ El nombre de la base es `MONGODB_DB_NAME`. Atlas tiene que aceptar transacciones
 
 El cron no aprueba tareas ni entrega plata.
 
-## API de MiUcha
+## API de MiHucha
 
 ### Sesión
 
@@ -68,7 +68,7 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | Renombrar en la tarjeta | `PATCH /api/families/:id` | Superusuario | Nombre de la familia, único, y nombre del banquero | Esos dos nombres |
 | Ver parámetros | `GET /api/families/current` | Banquero | — | Nombre, porcentajes, tasa, niños y auditores |
 | Guardar parámetros | `PATCH /api/families/current` | Banquero | Nombre único, porcentajes y `interestPercent` | El nombre y los tres porcentajes, si suman 100 |
-| Crear niño | `POST /api/children` | Banquero | Nombre, nacimiento, nombre en la casa, PIN | Niño y tres Uchas en cero |
+| Crear niño | `POST /api/children` | Banquero | Nombre, nacimiento, nombre en la casa, PIN | Niño y tres Huchas en cero |
 | Modificar niño | `PATCH /api/children/:id` | Banquero | Nombre, nacimiento, nombre en la casa y PIN si cambia | El niño |
 | Dar de baja niño | `PATCH /api/children/:id` | Banquero | `active: false` | El niño ya no entra. El libro sigue |
 | Restablecer PIN | `POST /api/children/:id/pin` | Banquero | PIN nuevo | PIN reemplazado |
@@ -89,13 +89,13 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | Marcar «¡Listo!» | `POST /api/tip-occurrences/:id/submit` | Niño | — | Estado `submitted` |
 | Aprobar o pedir mejora | `POST /api/tip-occurrences/:id/review` | Banquero o auditor | `approved` o `needs_improvement`, nota opcional | Si aprueba: tres asientos y tres saldos |
 
-### Uchas y plata
+### Huchas y plata
 
 | Operación | Método y ruta | Quién | Qué entra | Qué sale |
 | --- | --- | --- | --- | --- |
-| Ver Uchas | `GET /api/wallets` | Niño las suyas. Banquero y auditor, las de la familia | `childId` si es adulto | Saldos y disponible |
-| Transferir | `POST /api/transfers` | Niño | Ucha origen, Ucha destino, monto | Dos asientos |
-| Pedir plata | `POST /api/withdrawals` | Niño | Ucha, monto, nota opcional | Pedido `pending`, sin débito |
+| Ver Huchas | `GET /api/wallets` | Niño las suyas. Banquero y auditor, las de la familia | `childId` si es adulto | Saldos y disponible |
+| Transferir | `POST /api/transfers` | Niño | Hucha origen, Hucha destino, monto | Dos asientos |
+| Pedir plata | `POST /api/withdrawals` | Niño | Hucha, monto, nota opcional | Pedido `pending`, sin débito |
 | Entregar | `POST /api/withdrawals/:id/complete` | Banquero | — | `completed` y un débito |
 | Cancelar pedido | `POST /api/withdrawals/:id/cancel` | Niño o banquero | — | `cancelled`. El saldo no se tocó |
 | Movimientos | `GET /api/movements` | Niño los suyos. Adultos, los de la familia | Filtro por niño y mes | Libro |

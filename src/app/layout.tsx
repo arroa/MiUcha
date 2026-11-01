@@ -9,17 +9,17 @@ const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" });
 
 export const metadata: Metadata = {
-  title: "MiUcha",
+  title: "MiHucha",
   description: "Mi dinero. Mis decisiones.",
-  applicationName: "MiUcha",
+  applicationName: "MiHucha",
   manifest: "/manifest.webmanifest",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#6d4cff" },
-    { media: "(prefers-color-scheme: dark)", color: "#6d4cff" },
+    { media: "(prefers-color-scheme: light)", color: "#7b2cbf" },
+    { media: "(prefers-color-scheme: dark)", color: "#7b2cbf" },
   ],
   appleWebApp: {
     capable: true,
-    title: "MiUcha",
+    title: "MiHucha",
     statusBarStyle: "default",
   },
   icons: {

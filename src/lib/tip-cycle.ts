@@ -274,7 +274,7 @@ async function payTip(occurrence: TipOccurrence, adultId: string, session?: Clie
       { $inc: { balanceMinor: amountMinor }, $set: { updatedAt: now } },
       options,
     );
-    if (!wallet.matchedCount) throw new Error("Falta una Ucha de este niño.");
+    if (!wallet.matchedCount) throw new Error("Falta una Hucha de este niño.");
   }
 }
 

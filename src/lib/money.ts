@@ -174,7 +174,7 @@ export async function listChildWithdrawals(child: Child): Promise<WithdrawalView
 
 export async function requestWithdrawal(child: Child, input: unknown): Promise<WithdrawalView> {
   const json = (input ?? {}) as { walletType?: unknown; amountMinor?: unknown; note?: unknown };
-  if (!isWalletType(json.walletType)) throw new Error("Elige desde qué Ucha retirar.");
+  if (!isWalletType(json.walletType)) throw new Error("Elige desde qué Hucha retirar.");
   const amountMinor = parseAmount(json.amountMinor);
   const note = typeof json.note === "string" ? json.note.trim() : "";
   if (note.length > 160) throw new Error("La nota es demasiado larga.");
@@ -306,7 +306,7 @@ export async function transferGastoToInversion(child: Child, input: unknown) {
       { $inc: { balanceMinor: amountMinor }, $set: { updatedAt: now } },
       options,
     );
-    if (!credited.matchedCount) throw new Error("Falta la Ucha de Inversión.");
+    if (!credited.matchedCount) throw new Error("Falta la Hucha de Inversión.");
 
     await (await ledgerEntries()).insertMany(
       [
@@ -377,7 +377,7 @@ export async function creditRentabilidad(familyId: string, banqueroId: string, c
       { $inc: { balanceMinor: amountMinor }, $set: { updatedAt: now } },
       options,
     );
-    if (!credited.matchedCount) throw new Error("Falta la Ucha de Inversión.");
+    if (!credited.matchedCount) throw new Error("Falta la Hucha de Inversión.");
     await (await ledgerEntries()).insertOne(
       {
         _id: new ObjectId(),

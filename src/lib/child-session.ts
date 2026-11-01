@@ -1,6 +1,6 @@
 import { createSignedToken, readSignedToken } from "@/lib/signed-cookie";
 
-export const CHILD_COOKIE = "miucha_child";
+export const CHILD_COOKIE = "mihucha_child";
 const TWELVE_HOURS = 12 * 60 * 60;
 
 function secret(): string | null {

@@ -1,6 +1,6 @@
 # Arquitectura
 
-Cómo está hecha MiUcha. El detalle de cada API está en [Integration](./Integration.md). El modelo de datos está en [DataBase](./DataBase.md). Lo que la aplicación hace por las personas está en [Funcional](./Funcional.docx).
+Cómo está hecha MiHucha. El detalle de cada API está en [Integration](./Integration.md). El modelo de datos está en [DataBase](./DataBase.md). Lo que la aplicación hace por las personas está en [Funcional](./Funcional.docx).
 
 ## Stack
 
@@ -11,7 +11,7 @@ Cómo está hecha MiUcha. El detalle de cada API está en [Integration](./Integr
 | Base de datos | MongoDB Atlas, con el driver oficial. Sin ORM |
 | Dónde corre | Vercel. La PWA se instala desde el navegador |
 | Adultos | Clerk, código por email |
-| Niños | Identificador y PIN de 6 dígitos, sesión propia de MiUcha |
+| Niños | Identificador y PIN de 6 dígitos, sesión propia de MiHucha |
 | Plata | Pesos enteros. Mes e interés en `America/Santiago` |
 
 Una sola aplicación. Las familias no se mezclan: toda lectura y toda escritura filtra por `familyId` en el servidor.
@@ -32,7 +32,7 @@ La puerta del niño no viene de un arquetipo. El PIN no sirve para un adulto, y 
 | Superusuario | Clerk. Lo nombra `SUPER_ADMIN_EMAIL` | Al entrar ve su correo y las familias. Crea cada familia y a su banquero, y puede crear la suya. Si también es banquero, entra a ese rol en otra pantalla |
 | Banquero | Clerk. Uno por familia | Le pone el nombre a su familia, guarda la plata y toca los parámetros. En el mismo panel marca los Tips, les pone el precio, edita el nombre, elimina una tarea o agrega otra. Crea niños y auditores, entrega la plata y también puede aprobar un Tip |
 | Auditor | Clerk. Lo crea el banquero | Dice si la tarea quedó bien |
-| Niño | Identificador + PIN | Marca «¡Listo!», mueve entre Uchas y pide plata |
+| Niño | Identificador + PIN | Marca «¡Listo!», mueve entre Huchas y pide plata |
 
 Dar de baja a un auditor lo borra de la familia y de Clerk. Desactivar a un niño le cierra la entrada. Su libro de movimientos se conserva. El superusuario no se da de baja desde la aplicación.
 
@@ -64,8 +64,8 @@ Estas tres operaciones van en una transacción de MongoDB. Si un paso falla, no 
 | Operación | Qué queda escrito |
 | --- | --- |
 | Aprobar un Tip | La ocurrencia pasa a ganada, tres asientos, tres saldos, una novedad |
-| Transferir entre Uchas | Un débito y un crédito del mismo monto |
-| Entregar la plata | El pedido pasa a entregado y se debita esa Ucha |
+| Transferir entre Huchas | Un débito y un crédito del mismo monto |
+| Entregar la plata | El pedido pasa a entregado y se debita esa Hucha |
 
 Pedir plata no debita. El pedido pendiente reserva el monto para que no se pida dos veces el mismo saldo. El débito ocurre cuando el banquero marca que entregó el billete.
 
@@ -95,7 +95,7 @@ Se puede instalar. Sin red, las pantallas ya abiertas pueden verse con lo últim
 | Sistema | Para qué se usa |
 | --- | --- |
 | Clerk | Identidad de superusuario, banquero y auditor |
-| MongoDB Atlas | Todos los datos de MiUcha |
+| MongoDB Atlas | Todos los datos de MiHucha |
 | Vercel Cron | Ocurrencias de Tips e interés mensual |
 
 No hay pasarela de pago ni banco. La plata física la entrega el banquero.

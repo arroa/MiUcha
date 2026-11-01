@@ -39,7 +39,7 @@ body {
   font-family: var(--font-nunito), sans-serif;
 }
 
-@keyframes miucha-toast {
+@keyframes mihucha-toast {
   0% { opacity: 0; transform: translateY(-10px); }
   15% { opacity: 1; transform: translateY(0); }
   75% { opacity: 1; }
@@ -47,8 +47,8 @@ body {
 }
 
 /* Alineado con UI_TOAST_DURATION_MS (2000). */
-.miucha-toast {
-  animation: miucha-toast 2s ease forwards;
+.mihucha-toast {
+  animation: mihucha-toast 2s ease forwards;
 }
 
 @media (prefers-reduced-motion: no-preference) {

@@ -1,4 +1,4 @@
-# MiUcha
+# MiHucha
 
 Los niños ganan plata haciendo cosas de la casa. Los adultos la guardan de verdad.
 

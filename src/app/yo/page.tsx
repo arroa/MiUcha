@@ -45,13 +45,13 @@ async function Yo() {
       ? "Te llegaron intereses. Míralos en la campana."
       : notices.some((item) => item.kind === "tip" && item.text.includes("puede mejorar"))
         ? "Hay una tarea que puede mejorar. Mírala en la campana."
-        : "Viniste a mirar tus Uchas. Marca tus Tips cuando los termines.";
+        : "Viniste a mirar tus Huchas. Marca tus Tips cuando los termines.";
 
   return (
     <ChildShell>
       <header className="yo-rise">
         <p className="text-center text-2xl font-extrabold tracking-tight text-accent lg:text-left">
-          MiUcha
+          MiHucha
           <span className="mx-auto mt-0.5 block h-1 w-10 rounded-full bg-accent/40 lg:mx-0" />
         </p>
         <div className="mt-5 flex items-start justify-between gap-3">

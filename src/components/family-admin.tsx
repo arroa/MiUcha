@@ -767,7 +767,7 @@ function useToast() {
 function Notice({ message }: { message: string }) {
   if (!message) return null;
   return (
-    <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
+    <p role="status" className="mihucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
       {message}
     </p>
   );
@@ -989,7 +989,7 @@ function ChildCartola({ childId, childName, canCredit }: { childId: string; chil
         />
       ) : null}
       {toast ? (
-        <p role="status" className="miucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
+        <p role="status" className="mihucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
           {toast}
         </p>
       ) : null}
