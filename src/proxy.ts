@@ -20,6 +20,7 @@ function isPublic(pathname: string) {
     pathname.startsWith("/sign-in") ||
     pathname === "/entrar" ||
     pathname === "/despues" ||
+    pathname === "/sin-acceso" ||
     pathname.startsWith("/api/auth/dev-login") ||
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
@@ -36,6 +37,7 @@ async function hasDevSession(request: NextRequest) {
 async function guardWithoutClerk(request: NextRequest) {
   if (await hasDevSession(request)) return NextResponse.next();
   const pathname = request.nextUrl.pathname;
+  if (isPublic(pathname)) return NextResponse.next();
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
@@ -45,7 +47,9 @@ async function guardWithoutClerk(request: NextRequest) {
 const withClerk = clerkMiddleware(
   async (auth, request) => {
     if (await hasDevSession(request)) return;
-    // Usar nuestro /sign-in (no la UI hosted de accounts.dev).
+    const pathname = request.nextUrl.pathname;
+    // Debe correr en rutas públicas para el handshake de sesión de Clerk.
+    if (isPublic(pathname)) return;
     await auth.protect({
       unauthenticatedUrl: new URL("/sign-in", request.url).href,
     });
@@ -75,7 +79,6 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     return NextResponse.next();
   }
 
-  if (isPublic(pathname)) return NextResponse.next();
   if (!hasClerkKeys()) return guardWithoutClerk(request);
   return withClerk(request, event);
 }

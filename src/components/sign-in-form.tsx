@@ -1,8 +1,8 @@
 "use client";
 
-import { useSignIn } from "@clerk/nextjs/legacy";
+import { useAuth, useSignIn } from "@clerk/nextjs/legacy";
 import Link from "next/link";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { acceso } from "@/lib/acceso.config";
 
@@ -20,6 +20,12 @@ function clerkErrorMessage(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return "";
+}
+
+function isSessionExistsError(error: unknown): boolean {
+  if (!error || typeof error !== "object" || !("errors" in error)) return false;
+  const errors = (error as { errors?: { code?: string }[] }).errors;
+  return errors?.some((item) => item.code === "session_exists") ?? false;
 }
 
 export function SignInForm({ devBypass, clerkEnabled }: Props) {
@@ -123,6 +129,7 @@ function DevForm() {
 }
 
 function ClerkForm() {
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const clerk = useSignIn();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -130,10 +137,24 @@ function ClerkForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  if (!clerk.isLoaded || !clerk.signIn || !clerk.setActive) {
+  useEffect(() => {
+    if (authLoaded && isSignedIn) {
+      window.location.assign(acceso.rutaDespuesDeEntrar);
+    }
+  }, [authLoaded, isSignedIn]);
+
+  if (!authLoaded || !clerk.isLoaded || !clerk.signIn || !clerk.setActive) {
     return (
       <main className="grid min-h-full place-items-center text-muted">
         <p>Cargando…</p>
+      </main>
+    );
+  }
+
+  if (isSignedIn) {
+    return (
+      <main className="grid min-h-full place-items-center text-muted">
+        <p>Ya estás dentro. Entrando…</p>
       </main>
     );
   }
@@ -159,6 +180,10 @@ function ClerkForm() {
       await signIn.prepareFirstFactor({ strategy: "email_code", emailAddressId: factor.emailAddressId });
       setStep("code");
     } catch (err) {
+      if (isSessionExistsError(err)) {
+        window.location.assign(acceso.rutaDespuesDeEntrar);
+        return;
+      }
       setError(clerkErrorMessage(err) || "No se pudo iniciar sesión.");
     } finally {
       setLoading(false);
@@ -182,6 +207,10 @@ function ClerkForm() {
       }
       setError("No se pudo completar el acceso.");
     } catch (err) {
+      if (isSessionExistsError(err)) {
+        window.location.assign(acceso.rutaDespuesDeEntrar);
+        return;
+      }
       setError(clerkErrorMessage(err) || "Código inválido o expirado.");
     } finally {
       setLoading(false);
