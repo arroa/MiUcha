@@ -147,8 +147,14 @@ export type ChildGoal = {
 let indexesReady: Promise<void> | null = null;
 
 async function dropIndexIfPresent(collection: Collection, name: string) {
-  const indexes = await collection.indexes();
-  if (indexes.some((index) => index.name === name)) await collection.dropIndex(name);
+  try {
+    const indexes = await collection.indexes();
+    if (indexes.some((index) => index.name === name)) await collection.dropIndex(name);
+  } catch (error) {
+    // Atlas: colección todavía no creada.
+    if ((error as { code?: number }).code === 26) return;
+    throw error;
+  }
 }
 
 async function backfillFamilyNameKeys(collection: Collection<Family>) {
@@ -198,7 +204,12 @@ async function createIndexes() {
 }
 
 export async function ensureIndexes() {
-  indexesReady ??= createIndexes();
+  if (!indexesReady) {
+    indexesReady = createIndexes().catch((error) => {
+      indexesReady = null;
+      throw error;
+    });
+  }
   await indexesReady;
 }
 
