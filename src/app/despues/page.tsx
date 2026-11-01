@@ -13,6 +13,6 @@ export default function DespuesPage() {
 
 async function DespuesGate() {
   const adult = await getAdultSession();
-  if (!adult) redirect("/sign-in");
-  redirect(homeForAdult(adult));
+  redirect(adult ? homeForAdult(adult) : "/sign-in");
+  return null;
 }

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { ExternalLink, Star, Trophy } from "lucide-react";
-import { useId, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useId, useState } from "react";
 
 import { GoalBanqueroAsk } from "@/components/goal-banquero-ask";
 import { productLinkLabel } from "@/lib/goal-url";
