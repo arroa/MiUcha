@@ -19,6 +19,7 @@ function isPublic(pathname: string) {
     pathname === "/" ||
     pathname.startsWith("/sign-in") ||
     pathname === "/entrar" ||
+    pathname === "/despues" ||
     pathname.startsWith("/api/auth/dev-login") ||
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
@@ -41,10 +42,18 @@ async function guardWithoutClerk(request: NextRequest) {
   return redirectTo(request, "/sign-in");
 }
 
-const withClerk = clerkMiddleware(async (auth, request) => {
-  if (await hasDevSession(request)) return;
-  await auth.protect();
-});
+const withClerk = clerkMiddleware(
+  async (auth, request) => {
+    if (await hasDevSession(request)) return;
+    // Usar nuestro /sign-in (no la UI hosted de accounts.dev).
+    await auth.protect({
+      unauthenticatedUrl: new URL("/sign-in", request.url).href,
+    });
+  },
+  {
+    signInUrl: "/sign-in",
+  },
+);
 
 export async function proxy(request: NextRequest, event: NextFetchEvent) {
   const pathname = request.nextUrl.pathname;
