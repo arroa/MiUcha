@@ -2,6 +2,7 @@ import { MongoServerError, ObjectId, type ClientSession } from "mongodb";
 
 import { getChildSession } from "@/lib/child-account";
 import {
+  adults,
   children,
   families,
   ledgerEntries,
@@ -14,10 +15,11 @@ import {
 } from "@/lib/collections";
 import { requireFamilyAdult } from "@/lib/family-admin";
 import { inMoneySession } from "@/lib/money";
-import { santiagoToday, weekdayOf } from "@/lib/santiago-date";
+import { addDays, santiagoToday, weekdayOf } from "@/lib/santiago-date";
 
 export type TaskView = {
   id: string;
+  definitionId: string;
   title: string;
   amountMinor: number;
   status: TipOccurrenceStatus;
@@ -26,6 +28,8 @@ export type TaskView = {
   occurrenceDate: string;
   read: boolean;
 };
+
+export type TipWhen = "hoy" | "ayer";
 
 export function splitTip(amount: number, pctInversion: number, pctDonaciones: number) {
   const inversion = Math.floor((amount * pctInversion) / 100);
@@ -118,6 +122,53 @@ export async function confirmDay(child: Child, date: string, ids: string[]) {
     { $set: { status: "submitted", submittedAt: new Date(), reviewNote: "" } },
   );
   if (!result.matchedCount) throw new Error("Esas tareas ya no se pueden confirmar.");
+}
+
+/** Confirma un Tip indicando si fue hoy o ayer (sin calendario). */
+export async function confirmTipWhen(child: Child, occurrenceId: string, when: TipWhen) {
+  if (!ObjectId.isValid(occurrenceId)) throw new Error("Tip no encontrado.");
+  if (when !== "hoy" && when !== "ayer") throw new Error("Elige si lo hiciste hoy o ayer.");
+
+  const today = santiagoToday().date;
+  const date = when === "hoy" ? today : addDays(today, -1);
+  const col = await tipOccurrences();
+  const source = await col.findOne({ _id: new ObjectId(occurrenceId), childId: child._id });
+  if (!source) throw new Error("Tip no encontrado.");
+
+  if (when === "hoy") {
+    if (source.occurrenceDate !== today) throw new Error("Ese Tip no es de hoy.");
+    await confirmDay(child, today, [occurrenceId]);
+    return { date, when, title: source.title };
+  }
+
+  await ensureTasksForDate(child, date);
+  const yesterday = await col.findOne({
+    childId: child._id,
+    definitionId: source.definitionId,
+    occurrenceDate: date,
+  });
+  if (!yesterday) throw new Error("Ese Tip no tocaba ayer.");
+  if (yesterday.status !== "available" && yesterday.status !== "needs_improvement") {
+    throw new Error("Ese Tip de ayer ya está en revisión o listo.");
+  }
+  await confirmDay(child, date, [yesterday._id.toHexString()]);
+  return { date, when, title: source.title };
+}
+
+export async function listReviewerNames(familyId: ObjectId) {
+  const people = await (await adults())
+    .find({ familyId, active: true, role: { $in: ["banquero", "auditor"] } })
+    .project({ name: 1 })
+    .toArray();
+  return people.map((person) => person.name.trim()).filter(Boolean);
+}
+
+export function formatReviewerPhrase(names: string[]) {
+  if (names.length === 0) return "Un adulto de tu familia";
+  if (names.length === 1) return names[0];
+  if (names.length === 2) return `${names[0]} o ${names[1]}`;
+  const last = names[names.length - 1];
+  return `${names.slice(0, -1).join(", ")} o ${last}`;
 }
 
 async function withChildNames(rows: TipOccurrence[]): Promise<TaskView[]> {
@@ -230,6 +281,7 @@ async function payTip(occurrence: TipOccurrence, adultId: string, session?: Clie
 function toView(row: TipOccurrence, childName: string): TaskView {
   return {
     id: row._id.toHexString(),
+    definitionId: row.definitionId.toHexString(),
     title: row.title,
     amountMinor: row.amountMinor,
     status: row.status,

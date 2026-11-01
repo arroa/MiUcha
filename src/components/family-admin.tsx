@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { FamilyTips } from "@/components/family-tips";
 import { PinField } from "@/components/pin-help";
 import { TaskReview } from "@/components/task-review";
+import { parsePesosInput } from "@/lib/pesos-input";
 import { isPin } from "@/lib/pin-rules";
 import type { TipView } from "@/lib/tips";
 
@@ -206,7 +207,7 @@ function FamilyCard({
   }
 
   return (
-    <li className="flex h-full flex-col rounded-2xl border border-line bg-white p-3">
+    <li className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-white p-3">
       <p className="text-xs font-bold text-accent">{mine ? "Mi familia" : item.myRole === "auditor" ? "Auditor" : item.myRole === "banquero" ? "Banquero" : "Familia"}</p>
       {editing ? (
         <label className="mt-2 block text-xs">
@@ -233,30 +234,34 @@ function FamilyCard({
         <p className="truncate text-xs text-muted">{item.banqueroEmail}</p>
       )}
       {error ? <p className="mt-2 text-xs text-red-700">{error}</p> : null}
-      <div className="mt-auto grid grid-cols-2 gap-1.5 pt-3">
+      <div className="mt-auto flex flex-col gap-1.5 pt-3">
         {editing ? (
-          <>
-            <button type="button" disabled={busy} onClick={save} className="rounded-xl bg-accent px-3 py-2 text-sm font-bold text-white disabled:opacity-50">
+          <div className="grid grid-cols-2 gap-1.5">
+            <button type="button" disabled={busy} onClick={save} className="min-w-0 rounded-xl bg-accent px-2 py-2 text-sm font-bold text-white disabled:opacity-50">
               {busy ? "Guardando…" : "Guardar"}
             </button>
-            <button type="button" disabled={busy} onClick={cancel} className="rounded-xl border border-foreground/20 px-3 py-2 text-sm font-bold disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={cancel} className="min-w-0 rounded-xl border border-foreground/20 px-2 py-2 text-sm font-bold disabled:opacity-50">
               Cancelar
             </button>
-          </>
+          </div>
         ) : (
           <>
-            {manage ? (
-              <button type="button" onClick={beginEdit} className="rounded-xl border border-foreground/20 px-3 py-2 text-sm font-bold">
-                Editar
-              </button>
+            {manage || item.myRole ? (
+              <div className={`grid gap-1.5 ${manage && item.myRole ? "grid-cols-2" : "grid-cols-1"}`}>
+                {manage ? (
+                  <button type="button" onClick={beginEdit} className="w-full min-w-0 rounded-xl border border-foreground/20 px-2 py-2 text-sm font-bold">
+                    Editar
+                  </button>
+                ) : null}
+                {item.myRole ? (
+                  <a href={`/api/families/enter?id=${item.id}`} className="w-full min-w-0 rounded-xl bg-accent px-2 py-2 text-center text-sm font-bold text-white">
+                    Entrar
+                  </a>
+                ) : null}
+              </div>
             ) : null}
-            {item.myRole ? (
-              <a href={`/api/families/enter?id=${item.id}`} className={`rounded-xl bg-accent px-3 py-2 text-center text-sm font-bold text-white ${manage ? "" : "col-span-2"}`}>
-                Entrar
-              </a>
-            ) : null}
             {manage ? (
-              <button type="button" onClick={() => { setError(""); setConfirming(true); }} className={`rounded-xl border border-red-800/30 px-3 py-2 text-sm font-bold text-red-800 ${item.myRole ? "col-span-2" : ""}`}>
+              <button type="button" onClick={() => { setError(""); setConfirming(true); }} className="w-full rounded-xl border border-red-800/30 px-2 py-2 text-sm font-bold text-red-800">
                 Eliminar
               </button>
             ) : null}
@@ -613,7 +618,7 @@ function DatosPanel({
         <MiniStat wide label="Familia" value={params.name || "Sin nombre"} />
         <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
         <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
-        <MiniStat label="Donaciones" value={`${params.pctDonaciones}%`} />
+        <MiniStat label="Generosidad" value={`${params.pctDonaciones}%`} />
       </PreviewCard>
     );
   }
@@ -625,7 +630,7 @@ function DatosPanel({
           <MiniStat wide label="Familia" value={params.name || "Sin nombre"} />
           <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
           <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
-          <MiniStat label="Donaciones" value={`${params.pctDonaciones}%`} />
+          <MiniStat label="Generosidad" value={`${params.pctDonaciones}%`} />
         </div>
       </OpenCard>
     );
@@ -640,7 +645,7 @@ function DatosPanel({
         </div>
         <Input label="Inversión %" type="number" value={String(params.pctInversion)} onChange={(value) => setParams({ ...params, pctInversion: Number(value) })} />
         <Input label="Gasto %" type="number" value={String(params.pctGasto)} onChange={(value) => setParams({ ...params, pctGasto: Number(value) })} />
-        <Input label="Donaciones %" type="number" value={String(params.pctDonaciones)} onChange={(value) => setParams({ ...params, pctDonaciones: Number(value) })} />
+        <Input label="Generosidad %" type="number" value={String(params.pctDonaciones)} onChange={(value) => setParams({ ...params, pctDonaciones: Number(value) })} />
         {error ? <p className="text-sm text-red-700 sm:col-span-2">{error}</p> : null}
         {message ? <p className="text-sm text-accent sm:col-span-2">{message}</p> : null}
         <button className="rounded-2xl bg-accent px-4 py-3 font-bold text-white sm:col-span-2">Guardar parámetros</button>
@@ -868,7 +873,7 @@ type ChildCartolaView = {
 const WALLET_LABELS = {
   inversion: "Inversión",
   gasto: "Gasto",
-  donaciones: "Donaciones",
+  donaciones: "Generosidad",
 } as const;
 
 function pesos(amount: number) {
@@ -1018,9 +1023,9 @@ function InteresesModal({
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError("");
-    const value = Number(amount);
-    if (!Number.isInteger(value) || value <= 0) {
-      setError("El monto tiene que ser un número entero mayor que cero.");
+    const parsed = parsePesosInput(amount);
+    if (!parsed.ok) {
+      setError(parsed.error);
       return;
     }
     setBusy(true);
@@ -1028,14 +1033,14 @@ function InteresesModal({
       const res = await fetch("/api/rentabilidad", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ childId, amountMinor: value }),
+        body: JSON.stringify({ childId, amountMinor: parsed.value }),
       });
       const data = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
         setError(data?.error ?? "No se pudo abonar los intereses.");
         return;
       }
-      onDone(value);
+      onDone(parsed.value);
     } finally {
       setBusy(false);
     }
@@ -1067,13 +1072,14 @@ function InteresesModal({
         <label className="mt-5 block text-sm">
           Monto
           <input
-            inputMode="numeric"
+            inputMode="decimal"
             autoComplete="off"
             value={amount}
             onChange={(event) => {
               setError("");
-              setAmount(event.target.value.replace(/\D/g, ""));
+              setAmount(event.target.value);
             }}
+            aria-invalid={Boolean(error)}
             className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 ${error ? "border-red-700" : "border-line"}`}
           />
         </label>

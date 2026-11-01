@@ -14,15 +14,10 @@ import {
 import { requireBanquero, requireFamilyAdult } from "@/lib/family-admin";
 import { getMongoClient } from "@/lib/mongodb";
 
+import { WALLET_LABELS, WALLET_TYPES } from "@/lib/wallet-labels";
+
 export type { WalletType, WithdrawalStatus };
-
-export const WALLET_TYPES: WalletType[] = ["gasto", "donaciones", "inversion"];
-
-export const WALLET_LABELS: Record<WalletType, string> = {
-  gasto: "Gasto",
-  donaciones: "Donaciones",
-  inversion: "Inversión",
-};
+export { WALLET_LABELS, WALLET_TYPES };
 
 export type WalletView = {
   type: WalletType;

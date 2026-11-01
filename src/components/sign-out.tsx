@@ -25,7 +25,7 @@ export function ChildSignOut({ name, cheer }: { name: string; cheer: string }) {
 
   return (
     <>
-      <button type="button" className="shrink-0 rounded-2xl bg-foreground px-5 py-3 text-sm font-bold text-background" onClick={() => setOpen(true)}>
+      <button type="button" className="shrink-0 rounded-full bg-foreground px-4 py-2.5 text-sm font-bold text-background" onClick={() => setOpen(true)}>
         Salir
       </button>
       {open ? (
@@ -34,11 +34,14 @@ export function ChildSignOut({ name, cheer }: { name: string; cheer: string }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="despedida"
-            className="w-full max-w-md rounded-3xl bg-card p-8 shadow-lg"
+            className="relative w-full max-w-md rounded-3xl bg-card p-8 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
+            <button type="button" className="absolute right-4 top-4 text-sm font-bold text-muted" onClick={() => setOpen(false)} aria-label="Cerrar">
+              ✕
+            </button>
             <p className="text-sm font-bold text-accent">¡Felicitaciones!</p>
-            <h2 id="despedida" className="mt-2 font-serif text-4xl">
+            <h2 id="despedida" className="mt-2 text-3xl font-extrabold">
               ¡Hasta pronto, {name}!
             </h2>
             <p className="mt-4 text-lg">{cheer}</p>
@@ -48,10 +51,10 @@ export function ChildSignOut({ name, cheer }: { name: string; cheer: string }) {
               onClick={leave}
               className="mt-6 w-full rounded-2xl bg-accent py-3 font-bold text-white disabled:opacity-50"
             >
-              {leaving ? "Saliendo…" : "¡Chao!"}
+              {leaving ? "Saliendo…" : "Continuar"}
             </button>
             <button type="button" className="mt-3 w-full rounded-2xl border border-line py-3 font-bold" onClick={() => setOpen(false)}>
-              Me quedo
+              Cancelar
             </button>
           </div>
         </div>

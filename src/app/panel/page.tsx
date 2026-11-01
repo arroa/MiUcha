@@ -31,7 +31,9 @@ async function Panel() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold text-accent">{role}</p>
-          <h1 className="mt-1 font-serif text-4xl break-all">{adult.email}</h1>
+          <h1 className="mt-1 font-serif text-4xl break-all">
+            {adult.isSuperAdmin ? "Panel" : adult.email}
+          </h1>
         </div>
         <AdultSignOut via={adult.via} />
       </header>

@@ -9,6 +9,19 @@
   --muted: #5c675f;
 }
 
+/* Soft Quest — experiencia infantil (/yo). No altera el panel adulto. */
+.yo-soft {
+  --background: #f4f0ff;
+  --foreground: #1a1528;
+  --accent: #6d4cff;
+  --card: #ffffff;
+  --line: #ddd6f3;
+  --muted: #6b6280;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100%;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -28,11 +41,59 @@ body {
 
 @keyframes miucha-toast {
   0% { opacity: 0; transform: translateY(-10px); }
-  12% { opacity: 1; transform: translateY(0); }
-  78% { opacity: 1; }
+  15% { opacity: 1; transform: translateY(0); }
+  75% { opacity: 1; }
   100% { opacity: 0; }
 }
 
+/* Alineado con UI_TOAST_DURATION_MS (2000). */
 .miucha-toast {
-  animation: miucha-toast 3.2s ease forwards;
+  animation: miucha-toast 2s ease forwards;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .yo-soft .yo-rise {
+    animation: yo-rise 0.5s ease both;
+  }
+  .yo-soft .yo-rise-1 {
+    animation: yo-rise 0.5s ease 0.06s both;
+  }
+  .yo-soft .yo-rise-2 {
+    animation: yo-rise 0.5s ease 0.12s both;
+  }
+  .yo-soft .yo-rise-3 {
+    animation: yo-rise 0.5s ease 0.18s both;
+  }
+}
+
+@keyframes yo-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tip-celebrate {
+    animation: tip-celebrate 0.85s ease both;
+  }
+}
+
+@keyframes tip-celebrate {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(109, 76, 255, 0.35);
+  }
+  35% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 10px rgba(109, 76, 255, 0);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(109, 76, 255, 0);
+  }
 }

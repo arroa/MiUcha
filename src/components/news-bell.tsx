@@ -1,5 +1,6 @@
 "use client";
 
+import { Bell } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
@@ -70,18 +71,18 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
         aria-controls={panelId}
         aria-label={unread > 0 ? `Novedades, ${unread} sin leer` : "Novedades"}
         onClick={() => setOpen((current) => !current)}
-        className="relative grid size-12 place-items-center rounded-2xl border border-line bg-card"
+        className="relative grid size-11 place-items-center rounded-full border border-line bg-card shadow-sm"
       >
-        <BellIcon />
+        <Bell className="size-5 text-accent" aria-hidden />
         {unread > 0 ? (
-          <span className="absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full bg-accent px-1 text-xs font-bold text-white">
+          <span className="absolute -top-1 -right-1 grid min-w-5 place-items-center rounded-full bg-[#ff5a7a] px-1 text-xs font-bold text-white">
             {unread > 9 ? "9+" : unread}
           </span>
         ) : null}
       </button>
       {open ? (
         <div id={panelId} className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border border-line bg-card p-3 shadow-lg">
-          <p className="px-2 py-1 font-serif text-2xl">Novedades</p>
+          <p className="px-2 py-1 text-xl font-extrabold">Novedades</p>
           {rows.length === 0 ? <p className="px-2 py-3 text-sm text-muted">Cuando haya tips o intereses, aparecen aquí.</p> : null}
           <ul className="grid max-h-80 gap-2 overflow-auto">
             {rows.map((item) => (
@@ -112,14 +113,5 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
         </div>
       ) : null}
     </div>
-  );
-}
-
-function BellIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className="size-6">
-      <path d="M6 9a6 6 0 1 1 12 0c0 7 3 7 3 7H3s3 0 3-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M10 19a2 2 0 0 0 4 0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
   );
 }

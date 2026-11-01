@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 
 import type { Child, LedgerEntry, TipOccurrence, WalletType } from "@/lib/collections";
 import { ledgerEntries, tipOccurrences } from "@/lib/collections";
-import { WALLET_LABELS } from "@/lib/money";
+import { WALLET_LABELS } from "@/lib/wallet-labels";
 import { dayLabel, santiagoToday } from "@/lib/santiago-date";
 
 export type ChildNoticeKind = "tip" | "interest";

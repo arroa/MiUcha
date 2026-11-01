@@ -13,7 +13,7 @@ function pesos(amount: number) {
 const WALLET_LABELS = {
   inversion: "Inversión",
   gasto: "Gasto",
-  donaciones: "Donaciones",
+  donaciones: "Generosidad",
 } as const;
 
 type Decision = "approved" | "needs_improvement" | "rejected";

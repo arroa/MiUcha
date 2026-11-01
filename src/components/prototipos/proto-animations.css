@@ -1,0 +1,63 @@
+@media (prefers-reduced-motion: no-preference) {
+  .proto-rise {
+    animation: proto-rise 0.55s ease both;
+  }
+  .proto-rise-delay-1 {
+    animation: proto-rise 0.55s ease 0.08s both;
+  }
+  .proto-rise-delay-2 {
+    animation: proto-rise 0.55s ease 0.16s both;
+  }
+  .proto-rise-delay-3 {
+    animation: proto-rise 0.55s ease 0.24s both;
+  }
+  .proto-bar-fill {
+    animation: proto-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .proto-pulse-once {
+    animation: proto-pulse 0.7s ease;
+  }
+  .proto-coin-pop {
+    animation: proto-coin 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+}
+
+@keyframes proto-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes proto-bar {
+  from {
+    width: 0%;
+  }
+}
+
+@keyframes proto-pulse {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes proto-coin {
+  from {
+    opacity: 0;
+    transform: scale(0.6) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

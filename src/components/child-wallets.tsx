@@ -1,19 +1,33 @@
 "use client";
 
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { ArrowUpRight, Heart, ShoppingCart, TrendingUp } from "lucide-react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 
-import type { WalletType, WalletView, WithdrawalView } from "@/lib/money";
+import type { WalletView, WithdrawalView } from "@/lib/money";
+import { parsePesosInput } from "@/lib/pesos-input";
+import { UI_TOAST_DURATION_MS } from "@/lib/ui";
+import { WALLET_LABELS, type WalletType } from "@/lib/wallet-labels";
 
 function pesos(amount: number) {
   return `$${amount.toLocaleString("es-CL")}`;
 }
 
-const ORDER: WalletType[] = ["gasto", "donaciones", "inversion"];
+/** Orden Soft Quest: Gasto · Inversión · Generosidad */
+const ORDER: WalletType[] = ["gasto", "inversion", "donaciones"];
 
-const WALLET_LABELS: Record<WalletType, string> = {
-  inversion: "Inversión",
-  gasto: "Gasto",
-  donaciones: "Donaciones",
+const WALLET_META: Record<WalletType, { tone: string; icon: ReactNode }> = {
+  gasto: {
+    tone: "bg-[#ffe8ee] text-[#c2345a]",
+    icon: <ShoppingCart className="size-5" aria-hidden />,
+  },
+  inversion: {
+    tone: "bg-[#e5f8ec] text-[#0d7a45]",
+    icon: <TrendingUp className="size-5" aria-hidden />,
+  },
+  donaciones: {
+    tone: "bg-[#fff4d6] text-[#a66b00]",
+    icon: <Heart className="size-5" aria-hidden />,
+  },
 };
 
 export function ChildWallets({ initial }: { initial: WalletView[] }) {
@@ -24,6 +38,10 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
   const [action, setAction] = useState<"retirar" | "transferir" | null>(null);
   const [focus, setFocus] = useState<WalletType | null>(null);
   const [busyLock, setBusyLock] = useState(false);
+
+  useEffect(() => {
+    setWallets(initial);
+  }, [initial]);
 
   useEffect(() => {
     let active = true;
@@ -41,7 +59,7 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
 
   useEffect(() => {
     if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 2000);
+    const timer = window.setTimeout(() => setToast(""), UI_TOAST_DURATION_MS);
     return () => window.clearTimeout(timer);
   }, [toast]);
 
@@ -93,7 +111,7 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
       await refreshWallets();
       setAction(null);
       setFocus(null);
-      setToast(`Pedido de ${pesos(amountMinor)} enviado.`);
+      setToast(`Pedido de ${pesos(amountMinor)} enviado a tu Banquero.`);
     } finally {
       setBusyLock(false);
     }
@@ -144,38 +162,43 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
   const gasto = byType.get("gasto");
 
   return (
-    <section className="mt-8 grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-3">
+    <section className="yo-rise-1 flex h-full flex-col rounded-[1.75rem] bg-card p-5 shadow-[0_12px_40px_rgba(109,76,255,0.12)]">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-2xl font-extrabold leading-tight">Mis Uchas</h2>
+        <button
+          type="button"
+          disabled={busyLock || (gasto?.availableMinor ?? 0) <= 0}
+          onClick={openTransferir}
+          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[#0055ff] px-3 py-2 text-sm font-bold text-white disabled:opacity-40"
+        >
+          Invertir
+          <ArrowUpRight className="size-4" aria-hidden />
+        </button>
+      </div>
+      <div className="mt-3 grid flex-1 items-stretch gap-2.5 sm:grid-cols-3">
         {ORDER.map((type) => {
           const wallet = byType.get(type) ?? { type, balanceMinor: 0, reservedMinor: 0, availableMinor: 0 };
+          const meta = WALLET_META[type];
           return (
-            <article key={type} className="relative rounded-3xl border border-line bg-card p-5">
-              {busyLock ? <div className="absolute inset-0 z-10 rounded-3xl bg-white/50" aria-hidden /> : null}
-              <p className="text-sm text-muted">{WALLET_LABELS[type]}</p>
-              <p className="mt-1 text-[11px] text-muted">Disponible</p>
-              <p className="mt-1 font-serif text-4xl leading-none">{pesos(wallet.availableMinor)}</p>
+            <article key={type} className={`relative flex h-full flex-col rounded-2xl p-3.5 ${meta.tone}`}>
+              {busyLock ? <div className="absolute inset-0 z-10 rounded-2xl bg-white/50" aria-hidden /> : null}
+              <div className="flex items-center gap-1.5">
+                <div className="shrink-0 opacity-80">{meta.icon}</div>
+                <p className="text-[10px] font-bold uppercase leading-tight tracking-wide opacity-80">{WALLET_LABELS[type]}</p>
+              </div>
+              <p className="mt-3 text-center text-2xl font-extrabold leading-none text-foreground">{pesos(wallet.availableMinor)}</p>
               {wallet.reservedMinor > 0 ? (
-                <p className="mt-2 text-sm font-bold text-accent">Pediste {pesos(wallet.reservedMinor)}</p>
+                <p className="mt-2 text-center text-xs font-bold">Pediste {pesos(wallet.reservedMinor)}</p>
               ) : null}
-              <div className={`mt-4 grid gap-2 ${type === "gasto" ? "grid-cols-2" : "grid-cols-1"}`}>
+              <div className="mt-auto pt-5">
                 <button
                   type="button"
                   disabled={busyLock || wallet.availableMinor <= 0}
                   onClick={() => openRetirar(type)}
-                  className="rounded-2xl border border-foreground/15 px-3 py-2.5 text-sm font-bold disabled:opacity-40"
+                  className="w-full rounded-xl border border-foreground/15 bg-white/70 px-2 py-2.5 text-sm font-bold disabled:opacity-40"
                 >
                   Retirar
                 </button>
-                {type === "gasto" ? (
-                  <button
-                    type="button"
-                    disabled={busyLock || (gasto?.availableMinor ?? 0) <= 0}
-                    onClick={openTransferir}
-                    className="rounded-2xl bg-accent px-3 py-2.5 text-sm font-bold text-white disabled:opacity-40"
-                  >
-                    A inversión
-                  </button>
-                ) : null}
               </div>
             </article>
           );
@@ -183,11 +206,11 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
       </div>
 
       {pending.length > 0 ? (
-        <div className="rounded-3xl border border-line bg-card p-5">
-          <h2 className="font-serif text-2xl">Pedidos abiertos</h2>
-          <ul className="mt-3 grid gap-2">
+        <div className="mt-4 rounded-2xl border border-line bg-[#f8f5ff] p-4">
+          <h3 className="text-sm font-extrabold">Pedidos a tu Banquero</h3>
+          <ul className="mt-2 grid gap-2">
             {pending.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-white px-4 py-3">
+              <li key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="font-bold">
                     {pesos(row.amountMinor)} · {WALLET_LABELS[row.walletType]}
@@ -213,7 +236,11 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
       {action === "retirar" && focus ? (
         <MoneyModal
           title={`Retirar de ${WALLET_LABELS[focus]}`}
-          hint="El banquero te entrega el billete. Mientras tanto, ese monto queda reservado."
+          hint={
+            focus === "donaciones"
+              ? "Este dinero es para ayudar. Tu Banquero te lo entrega. Mientras tanto queda reservado."
+              : "Tu Banquero te entrega el billete. Mientras tanto, ese monto queda reservado."
+          }
           max={byType.get(focus)?.availableMinor ?? 0}
           noteField={focus === "donaciones" ? "¿A quién ayuda?" : "¿Para qué? (opcional)"}
           noteRequired={false}
@@ -222,14 +249,14 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
           onClearError={() => setError("")}
           onClose={close}
           onSubmit={onRetirar}
-          confirmLabel="Pedir plata"
+          confirmLabel="Pedir a mi Banquero"
         />
       ) : null}
 
       {action === "transferir" ? (
         <MoneyModal
           title="Pasar a Inversión"
-          hint="Solo desde Gasto hacia Inversión."
+          hint="Solo desde Gasto hacia Inversión. Así tu plata puede crecer."
           max={gasto?.availableMinor ?? 0}
           busy={busyLock}
           error={error}
@@ -290,17 +317,12 @@ function MoneyModal({
   async function submit(event: FormEvent) {
     event.preventDefault();
     clearErrors();
-    const raw = amount.trim();
-    if (!raw) {
-      setLocalError("Escribe cuánto quieres mover.");
+    const parsed = parsePesosInput(amount);
+    if (!parsed.ok) {
+      setLocalError(parsed.error === "Escribe un monto." ? "Escribe cuánto quieres mover." : parsed.error);
       return;
     }
-    const value = Number(raw);
-    if (!Number.isInteger(value) || value <= 0) {
-      setLocalError("El monto tiene que ser un número entero mayor que cero.");
-      return;
-    }
-    if (value > max) {
+    if (parsed.value > max) {
       setLocalError(`Solo puedes usar hasta ${pesos(max)}.`);
       return;
     }
@@ -308,7 +330,7 @@ function MoneyModal({
       setLocalError("Cuéntanos para qué es.");
       return;
     }
-    await onSubmit(value, note.trim());
+    await onSubmit(parsed.value, note.trim());
   }
 
   return (
@@ -324,7 +346,7 @@ function MoneyModal({
       >
         {busy ? <div className="absolute inset-0 z-10 grid place-items-center rounded-3xl bg-white/55" aria-busy="true"><Spinner /></div> : null}
         <div className="flex items-start justify-between gap-3">
-          <h2 id={titleId} className="font-serif text-3xl">
+          <h2 id={titleId} className="text-2xl font-extrabold leading-tight">
             {title}
           </h2>
           <button type="button" disabled={busy} onClick={onClose} className="text-sm font-bold text-muted disabled:opacity-50" aria-label="Cerrar">
@@ -333,23 +355,22 @@ function MoneyModal({
         </div>
         <p className="mt-2 text-sm text-muted">{hint}</p>
         <p className="mt-1 text-sm font-bold">Disponible: {pesos(max)}</p>
-        <label className="mt-5 block text-sm">
+        <label className="mt-5 block text-sm font-bold">
           Monto
           <input
-            inputMode="numeric"
+            inputMode="decimal"
             autoComplete="off"
             value={amount}
             onChange={(event) => {
-              const next = event.target.value.replace(/\D/g, "");
               clearErrors();
-              setAmount(next);
+              setAmount(event.target.value);
             }}
             aria-invalid={Boolean(shownError)}
-            className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 ${shownError ? "border-red-700" : "border-line"}`}
+            className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 font-normal ${shownError ? "border-red-700" : "border-line"}`}
           />
         </label>
         {noteField ? (
-          <label className="mt-3 block text-sm">
+          <label className="mt-3 block text-sm font-bold">
             {noteField}
             <input
               value={note}
@@ -357,7 +378,7 @@ function MoneyModal({
                 clearErrors();
                 setNote(event.target.value);
               }}
-              className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3"
+              className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
             />
           </label>
         ) : null}

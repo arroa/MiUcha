@@ -3,6 +3,8 @@ import { fileURLToPath } from "node:url";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Permite HMR al probar desde el celular en la misma WiFi (IP del PC).
+  allowedDevOrigins: ["192.168.100.159"],
   cacheComponents: true,
   partialPrefetching: true,
   reactCompiler: true,

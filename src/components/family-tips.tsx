@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { TIP_CATALOG } from "@/lib/tip-catalog";
 import type { TipView } from "@/lib/tips";
@@ -225,10 +225,10 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
       <p className="mt-1 text-sm text-muted">{activeCount === 1 ? "1 activa" : `${activeCount} activas`}.</p>
       {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
       {message ? <p className="mt-3 text-sm text-accent">{message}</p> : null}
-      <ul className="mt-4 grid grid-cols-2 gap-2">
-        <li>
+      <ul className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <li className="sm:col-span-2 sm:max-w-none">
           {picked === "new" ? (
-            <form onSubmit={addTask} className="grid gap-3 rounded-2xl border border-accent bg-white p-3">
+            <form onSubmit={addTask} className="grid gap-3 rounded-2xl border border-accent bg-white p-3 sm:max-w-md">
               <div className="flex items-baseline justify-between gap-3">
                 <p className="font-serif text-xl">Nueva tarea</p>
                 <button type="button" onClick={() => setPicked(null)} className="text-sm font-bold text-muted">
@@ -251,7 +251,7 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
               </button>
             </form>
           ) : (
-            <button type="button" onClick={() => setPicked("new")} className="h-full w-full rounded-2xl border border-dashed border-accent/50 bg-white px-3 py-3 text-left hover:border-accent">
+            <button type="button" onClick={() => setPicked("new")} className="w-full rounded-2xl border border-dashed border-accent/50 bg-white px-3 py-3 text-left hover:border-accent sm:max-w-md">
               <span className="block text-xs text-muted">Sumar</span>
               <span className="block font-serif text-xl">Nueva tarea</span>
             </button>
@@ -259,33 +259,36 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
         </li>
         {rows.map((row) => (
           <li key={row.key}>
-            <article className={`rounded-2xl border p-2.5 ${row.active ? "border-accent bg-accent/10" : "border-line bg-white"}`}>
-              <div className="flex items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-sm font-bold">
+            <article className={`rounded-2xl border p-3 ${row.active ? "border-accent bg-accent/10" : "border-line bg-white"}`}>
+              <div className="flex items-start justify-between gap-2">
+                <label className="flex min-w-0 items-center gap-2 text-sm font-bold">
                   <input
                     type="checkbox"
                     checked={row.active}
                     disabled={busy}
                     onChange={(event) => toggleActive(row, event.target.checked)}
-                    className="size-5 accent-accent disabled:opacity-100"
+                    className="size-5 shrink-0 accent-accent disabled:opacity-100"
                   />
                   Activa
                 </label>
-                <div className="flex items-center gap-1">
+                {row.editing ? (
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => (row.editing ? finish(row) : edit(row.key))}
-                    className="rounded-xl border border-foreground/20 bg-white px-2.5 py-1 text-sm font-bold disabled:opacity-50"
+                    onClick={() => finish(row)}
+                    className="shrink-0 rounded-xl border border-accent bg-white px-3 py-1.5 text-sm font-bold text-accent disabled:opacity-50"
                   >
-                    {row.editing ? "Listo" : "Editar"}
+                    Listo
                   </button>
-                  <button type="button" disabled={busy} className="rounded-xl px-2.5 py-1 text-sm font-bold text-red-800 disabled:opacity-50" onClick={() => setConfirming(row)}>
-                    Eliminar
-                  </button>
-                </div>
+                ) : (
+                  <TipRowMenu
+                    disabled={busy}
+                    onEdit={() => edit(row.key)}
+                    onRemove={() => setConfirming(row)}
+                  />
+                )}
               </div>
-              <div className="mt-2 flex items-start justify-between gap-3">
+              <div className="mt-3 flex items-start justify-between gap-3">
                 {row.editing ? (
                   <input
                     value={row.title}
@@ -326,14 +329,19 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
             className="w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
             onClick={(event) => event.stopPropagation()}
           >
-            <h2 id="eliminar-tarea" className="font-serif text-3xl">
-              ¿Eliminar {confirming.title}?
-            </h2>
+            <div className="flex items-start justify-between gap-3">
+              <h2 id="eliminar-tarea" className="font-serif text-3xl">
+                ¿Eliminar {confirming.title}?
+              </h2>
+              <button type="button" disabled={busy} onClick={() => setConfirming(null)} className="text-sm font-bold text-muted disabled:opacity-50" aria-label="Cerrar">
+                ✕
+              </button>
+            </div>
             <p className="mt-3">Deja de aparecer en la lista.</p>
             {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
             <div className="mt-6 grid grid-cols-2 gap-2">
               <button type="button" disabled={busy} onClick={() => remove(confirming)} className="rounded-2xl bg-red-800 px-4 py-3 font-bold text-white disabled:opacity-50">
-                {busy ? "Eliminando…" : "Eliminar"}
+                {busy ? "Eliminando…" : "Continuar"}
               </button>
               <button type="button" disabled={busy} onClick={() => setConfirming(null)} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
                 Cancelar
@@ -343,5 +351,72 @@ export function FamilyTips({ initialTips, mode, onToggle }: { initialTips: TipVi
         </div>
       ) : null}
     </section>
+  );
+}
+
+function TipRowMenu({ disabled, onEdit, onRemove }: { disabled?: boolean; onEdit: () => void; onRemove: () => void }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function onPointer(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-controls={menuId}
+        aria-label="Más acciones"
+        onClick={() => setOpen((current) => !current)}
+        className="grid size-9 place-items-center rounded-xl border border-foreground/15 bg-white text-lg font-bold leading-none disabled:opacity-50"
+      >
+        ···
+      </button>
+      {open ? (
+        <div id={menuId} role="menu" className="absolute right-0 z-20 mt-1 w-40 overflow-hidden rounded-2xl border border-line bg-white shadow-lg">
+          <button
+            type="button"
+            role="menuitem"
+            disabled={disabled}
+            onClick={() => {
+              setOpen(false);
+              onEdit();
+            }}
+            className="block w-full px-4 py-3 text-left text-sm font-bold hover:bg-background disabled:opacity-50"
+          >
+            Editar
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            disabled={disabled}
+            onClick={() => {
+              setOpen(false);
+              onRemove();
+            }}
+            className="block w-full px-4 py-3 text-left text-sm font-bold text-red-800 hover:bg-background disabled:opacity-50"
+          >
+            Eliminar
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }

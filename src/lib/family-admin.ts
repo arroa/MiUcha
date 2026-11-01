@@ -165,7 +165,7 @@ export async function updateFamilyParameters(input: {
   if (!name) throw new Error("Ponle un nombre a la familia.");
   if (name.length > 80) throw new Error("El nombre de la familia es demasiado largo.");
   if (!percentagesAreValid(input.pctInversion, input.pctGasto, input.pctDonaciones)) {
-    throw new Error("Los porcentajes de Inversión, Gasto y Donaciones tienen que sumar 100.");
+    throw new Error("Los porcentajes de Inversión, Gasto y Generosidad tienen que sumar 100.");
   }
   await saveFamilyName(new ObjectId(input.familyId), name, {
     pctInversion: input.pctInversion,

@@ -4,6 +4,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { readChildSessionFromRequest } from "@/lib/child-session";
 import { isDevBypassEnabled } from "@/lib/dev-flags";
 import { readDevSessionFromRequest } from "@/lib/dev-session";
+import { redirectTo } from "@/lib/request-url";
 
 function hasClerkKeys() {
   return Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
@@ -18,6 +19,7 @@ function isPublic(pathname: string) {
     pathname === "/" ||
     pathname.startsWith("/sign-in") ||
     pathname === "/entrar" ||
+    pathname.startsWith("/prototipos") ||
     pathname.startsWith("/api/auth/dev-login") ||
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
@@ -37,7 +39,7 @@ async function guardWithoutClerk(request: NextRequest) {
   if (pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
-  return NextResponse.redirect(new URL("/sign-in", request.url));
+  return redirectTo(request, "/sign-in");
 }
 
 const withClerk = clerkMiddleware(async (auth, request) => {
@@ -50,7 +52,7 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
 
   if (isChildRoute(pathname)) {
     if (await readChildSessionFromRequest(request)) return NextResponse.next();
-    return NextResponse.redirect(new URL("/entrar", request.url));
+    return redirectTo(request, "/entrar");
   }
 
   if (
@@ -58,7 +60,8 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
       pathname.startsWith("/api/wallets") ||
       pathname.startsWith("/api/withdrawals") ||
       pathname.startsWith("/api/transfers") ||
-      pathname.startsWith("/api/child-news")) &&
+      pathname.startsWith("/api/child-news") ||
+      pathname.startsWith("/api/goals")) &&
     (await readChildSessionFromRequest(request))
   ) {
     return NextResponse.next();

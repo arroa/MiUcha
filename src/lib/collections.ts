@@ -2,8 +2,9 @@ import type { Collection, ObjectId } from "mongodb";
 
 import { familyNameKey } from "@/lib/family-name";
 import { getDb } from "@/lib/mongodb";
+import type { WalletType } from "@/lib/wallet-labels";
 
-export type WalletType = "inversion" | "gasto" | "donaciones";
+export type { WalletType };
 
 export type Family = {
   _id: ObjectId;
@@ -124,6 +125,25 @@ export type TipDefinition = {
   createdAt: Date;
 };
 
+export type GoalStatus = "active" | "achieved" | "discarded";
+
+/** Objetivo personal: planificación/motivación. No reserva ni mueve dinero. */
+export type ChildGoal = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  name: string;
+  description: string;
+  targetAmountMinor: number;
+  iconId: string;
+  productUrl: string | null;
+  status: GoalStatus;
+  isFavorite: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt: Date | null;
+};
+
 let indexesReady: Promise<void> | null = null;
 
 async function dropIndexIfPresent(collection: Collection, name: string) {
@@ -169,6 +189,11 @@ async function createIndexes() {
     db.collection("ledger_entries").createIndex({ operationId: 1, walletType: 1 }, { unique: true }),
     db.collection("withdrawal_requests").createIndex({ familyId: 1, status: 1, createdAt: -1 }),
     db.collection("withdrawal_requests").createIndex({ childId: 1, status: 1 }),
+    db.collection("child_goals").createIndex({ familyId: 1, childId: 1, status: 1, updatedAt: -1 }),
+    db.collection("child_goals").createIndex(
+      { childId: 1 },
+      { unique: true, partialFilterExpression: { isFavorite: true, status: "active" } },
+    ),
   ]);
 }
 
@@ -215,4 +240,9 @@ export async function ledgerEntries(): Promise<Collection<LedgerEntry>> {
 export async function withdrawalRequests(): Promise<Collection<WithdrawalRequest>> {
   await ensureIndexes();
   return (await getDb()).collection<WithdrawalRequest>("withdrawal_requests");
+}
+
+export async function childGoals(): Promise<Collection<ChildGoal>> {
+  await ensureIndexes();
+  return (await getDb()).collection<ChildGoal>("child_goals");
 }
