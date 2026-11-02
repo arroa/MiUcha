@@ -49,7 +49,7 @@ async function Yo() {
 
   return (
     <ChildShell>
-      <header className="yo-rise">
+      <header className="yo-rise relative z-40">
         <p className="text-center text-2xl font-extrabold tracking-tight text-accent lg:text-left">
           MiHucha
           <span className="mx-auto mt-0.5 block h-1 w-10 rounded-full bg-accent/40 lg:mx-0" />

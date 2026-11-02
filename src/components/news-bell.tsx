@@ -64,7 +64,7 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
   }
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={`relative ${open ? "z-50" : ""}`}>
       <button
         type="button"
         aria-expanded={open}
@@ -81,7 +81,7 @@ export function NewsBell({ items }: { items: NewsItem[] }) {
         ) : null}
       </button>
       {open ? (
-        <div id={panelId} className="absolute right-0 z-30 mt-2 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border border-line bg-card p-3 shadow-lg">
+        <div id={panelId} className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-3rem))] rounded-3xl border border-line bg-card p-3 shadow-lg">
           <p className="px-2 py-1 text-xl font-extrabold">Novedades</p>
           {rows.length === 0 ? <p className="px-2 py-3 text-sm text-muted">Cuando haya tips o intereses, aparecen aquí.</p> : null}
           <ul className="grid max-h-80 gap-2 overflow-auto">
