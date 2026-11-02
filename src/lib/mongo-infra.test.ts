@@ -21,6 +21,15 @@ describe("isMongoInfrastructureError", () => {
     expect(isMongoInfrastructureError(notPrimary)).toBe(true);
   });
 
+  it("detecta error de sesión/transacción en paralelo", () => {
+    const parallelTxn = new MongoServerError({
+      message: "Only servers in a sharded cluster can start a new transaction at the active transaction number",
+      ok: 0,
+      code: 20,
+    });
+    expect(isMongoInfrastructureError(parallelTxn)).toBe(true);
+  });
+
   it("no trata errores de negocio como infraestructura", () => {
     const duplicate = new MongoServerError({ message: "E11000 duplicate key", ok: 0, code: 11000 });
     expect(isMongoInfrastructureError(duplicate)).toBe(false);

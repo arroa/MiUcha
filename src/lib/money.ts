@@ -96,10 +96,11 @@ async function reservedByWallet(familyId: ObjectId, childId: ObjectId, session?:
 }
 
 export async function walletsSnapshot(familyId: ObjectId, childId: ObjectId, session?: ClientSession): Promise<WalletView[]> {
-  const [walletRows, reserved] = await Promise.all([
-    (await wallets()).find({ familyId, childId }, session ? { session } : {}).toArray(),
-    reservedByWallet(familyId, childId, session),
-  ]);
+  // Dentro de una transacción MongoDB no admite operaciones en paralelo sobre la misma sesión
+  // (Promise.all provoca: "Only servers in a sharded cluster can start a new transaction...").
+  const options = session ? { session } : {};
+  const walletRows = await (await wallets()).find({ familyId, childId }, options).toArray();
+  const reserved = await reservedByWallet(familyId, childId, session);
   const byType = new Map(walletRows.map((row) => [row.type, row.balanceMinor]));
   return WALLET_TYPES.map((type) => {
     const balanceMinor = byType.get(type) ?? 0;

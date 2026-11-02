@@ -82,6 +82,7 @@ export function isMongoInfrastructureError(error: unknown): boolean {
       message.includes("connection timed out") ||
       message.includes("econnrefused") ||
       message.includes("econnreset") ||
+      message.includes("active transaction number") ||
       (message.includes("socket") && message.includes("closed"))
     ) {
       return true;
@@ -95,7 +96,8 @@ export function isMongoInfrastructureError(error: unknown): boolean {
     message.includes("econnrefused") ||
     message.includes("mongoserverselectionerror") ||
     message.includes("topology was destroyed") ||
-    message.includes("topology is closed")
+    message.includes("topology is closed") ||
+    message.includes("active transaction number")
   ) {
     return true;
   }
