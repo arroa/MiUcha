@@ -2,7 +2,7 @@ import { ObjectId } from "mongodb";
 import { NextResponse } from "next/server";
 
 import { adults, children, families } from "@/lib/collections";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { requireBanquero, updateFamilyParameters } from "@/lib/family-admin";
 
 export async function GET() {
@@ -64,6 +64,6 @@ export async function PATCH(request: Request) {
     });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

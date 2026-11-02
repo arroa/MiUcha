@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { previewRentabilidadForBanquero, settleRentabilidadForBanquero } from "@/lib/rentabilidad";
 
 export async function GET(request: Request) {
@@ -9,9 +9,7 @@ export async function GET(request: Request) {
     const preview = await previewRentabilidadForBanquero(period || undefined);
     return NextResponse.json({ ok: true, rentabilidad: preview });
   } catch (error) {
-    const message = formatClerkError(error);
-    const status = message === "No autorizado." ? 401 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -33,8 +31,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, rentabilidad: result }, { status: 201 });
   } catch (error) {
-    const message = formatClerkError(error);
-    const status = message === "No autorizado." ? 401 : 400;
-    return NextResponse.json({ error: message }, { status });
+    return jsonErrorResponse(error);
   }
 }

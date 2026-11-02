@@ -302,12 +302,12 @@ export async function reviewTask(
   });
 }
 
-async function payTip(occurrence: TipOccurrence, adultId: string, session?: ClientSession) {
-  const family = await (await families()).findOne({ _id: occurrence.familyId }, session ? { session } : {});
+async function payTip(occurrence: TipOccurrence, adultId: string, session: ClientSession) {
+  const options = { session };
+  const family = await (await families()).findOne({ _id: occurrence.familyId }, options);
   if (!family) throw new Error("No encontramos la familia.");
   const parts = splitTip(occurrence.amountMinor, family.pctInversion, family.pctDonaciones);
   const now = new Date();
-  const options = session ? { session } : {};
   const flipped = await (await tipOccurrences()).updateOne(
     { _id: occurrence._id, status: "submitted" },
     {

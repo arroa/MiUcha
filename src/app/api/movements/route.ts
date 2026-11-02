@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getChildSession } from "@/lib/child-account";
 import { listChildMovements, recentMovementPeriods } from "@/lib/child-feed";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { periodKeyFromIso, santiagoToday } from "@/lib/santiago-date";
 
 export async function GET(request: Request) {
@@ -18,9 +19,6 @@ export async function GET(request: Request) {
       movements,
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "No se pudieron cargar los movimientos." },
-      { status: 400 },
-    );
+    return jsonErrorResponse(error);
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { deactivateChild, getChildCartola, requireBanquero, requireFamilyAdult, updateChildAccount } from "@/lib/family-admin";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const cartola = await getChildCartola(session.familyId, id);
     return NextResponse.json({ cartola });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -31,6 +31,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const child = await updateChildAccount(session.familyId, id, json);
     return NextResponse.json({ ok: true, child });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

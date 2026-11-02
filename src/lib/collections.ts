@@ -262,57 +262,50 @@ export async function ensureIndexes() {
   await indexesReady;
 }
 
+/**
+ * Acceso a colecciones sin crear/mantener índices en el tráfico de usuarios.
+ * Índices: `npm run db:indexes` (scripts/ensure-indexes.ts) o deploy/migración.
+ */
 export async function families(): Promise<Collection<Family>> {
-  await ensureIndexes();
   return (await getDb()).collection<Family>("families");
 }
 
 export async function adults(): Promise<Collection<Adult>> {
-  await ensureIndexes();
   return (await getDb()).collection<Adult>("adults");
 }
 
 export async function children(): Promise<Collection<Child>> {
-  await ensureIndexes();
   return (await getDb()).collection<Child>("children");
 }
 
 export async function wallets(): Promise<Collection<Wallet>> {
-  await ensureIndexes();
   return (await getDb()).collection<Wallet>("wallets");
 }
 
 export async function tipDefinitions(): Promise<Collection<TipDefinition>> {
-  await ensureIndexes();
   return (await getDb()).collection<TipDefinition>("tip_definitions");
 }
 
 export async function tipOccurrences(): Promise<Collection<TipOccurrence>> {
-  await ensureIndexes();
   return (await getDb()).collection<TipOccurrence>("tip_occurrences");
 }
 
 export async function ledgerEntries(): Promise<Collection<LedgerEntry>> {
-  await ensureIndexes();
   return (await getDb()).collection<LedgerEntry>("ledger_entries");
 }
 
 export async function withdrawalRequests(): Promise<Collection<WithdrawalRequest>> {
-  await ensureIndexes();
   return (await getDb()).collection<WithdrawalRequest>("withdrawal_requests");
 }
 
 export async function depositRequests(): Promise<Collection<DepositRequest>> {
-  await ensureIndexes();
   return (await getDb()).collection<DepositRequest>("deposit_requests");
 }
 
 export async function childGoals(): Promise<Collection<ChildGoal>> {
-  await ensureIndexes();
   return (await getDb()).collection<ChildGoal>("child_goals");
 }
 
 export async function rentabilidadPagos(): Promise<Collection<RentabilidadPago>> {
-  await ensureIndexes();
   return (await getDb()).collection<RentabilidadPago>("rentabilidad_pagos");
 }

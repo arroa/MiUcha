@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { deleteFamily, renameFamilyCard, requireSuperAdmin } from "@/lib/family-admin";
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -12,7 +12,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const family = await renameFamilyCard(id, await request.json().catch(() => null));
     return NextResponse.json({ ok: true, family });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -25,6 +25,6 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     const family = await deleteFamily(id);
     return NextResponse.json({ ok: true, family, mine: family.id === session.familyId });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

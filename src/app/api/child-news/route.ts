@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getChildSession } from "@/lib/child-account";
 import { markChildNotice, type ChildNoticeKind } from "@/lib/child-feed";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 
 export async function POST(request: Request) {
   const child = await getChildSession();
@@ -20,6 +20,6 @@ export async function POST(request: Request) {
     await markChildNotice(child, id, kind as ChildNoticeKind, action);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

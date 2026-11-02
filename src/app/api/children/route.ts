@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { createChildAccount, requireBanquero } from "@/lib/family-admin";
 
 export async function POST(request: Request) {
@@ -24,6 +24,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, child }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getChildSession } from "@/lib/child-account";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import {
   historyDepositsForAdult,
   listChildDeposits,
@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     if (!data) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     return NextResponse.json(data);
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -40,6 +40,6 @@ export async function POST(request: Request) {
     const deposit = await requestDeposit(child, await request.json().catch(() => null));
     return NextResponse.json({ ok: true, deposit }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

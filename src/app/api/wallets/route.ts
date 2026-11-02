@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { walletsForAdultChild, walletsForCurrentChild } from "@/lib/money";
 
 export async function GET(request: Request) {
@@ -14,6 +14,6 @@ export async function GET(request: Request) {
     if (!wallets) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
     return NextResponse.json({ wallets });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

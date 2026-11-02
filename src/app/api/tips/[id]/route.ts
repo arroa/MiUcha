@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { requireBanquero } from "@/lib/family-admin";
 import { updateFamilyTip } from "@/lib/tips";
 
@@ -13,6 +13,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const tip = await updateFamilyTip(session.familyId, id, await request.json().catch(() => null));
     return NextResponse.json({ ok: true, tip });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

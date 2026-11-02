@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getChildSession } from "@/lib/child-account";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { getGoalForChild, updateGoalForChild } from "@/lib/goals";
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,7 +15,7 @@ export async function GET(_request: Request, { params }: Params) {
     const goal = await getGoalForChild(child, id);
     return NextResponse.json({ goal });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -28,6 +28,6 @@ export async function PATCH(request: Request, { params }: Params) {
     const goal = await updateGoalForChild(child, id, await request.json().catch(() => null));
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

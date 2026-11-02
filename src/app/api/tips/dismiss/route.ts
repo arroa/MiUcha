@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { requireBanquero } from "@/lib/family-admin";
 import { dismissFamilyTask } from "@/lib/tips";
 
@@ -13,6 +13,6 @@ export async function POST(request: Request) {
     await dismissFamilyTask(session.familyId, json?.key ?? "");
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

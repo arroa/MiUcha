@@ -270,7 +270,7 @@ export async function settleRentabilidadForBanquero(input: {
   const now = new Date();
 
   await inMoneySession(async (session) => {
-    const options = session ? { session } : {};
+    const options = { session };
     const alreadyLedger = await (await ledgerEntries()).findOne({ operationId, walletType: "inversion" }, options);
     if (alreadyLedger) throw new Error("La rentabilidad de ese mes ya está abonada para este niño.");
 

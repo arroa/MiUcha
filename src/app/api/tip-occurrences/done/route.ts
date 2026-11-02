@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { jsonErrorResponse } from "@/lib/http-errors";
+
 import { getChildSession } from "@/lib/child-account";
 import { confirmTipWhen, type TipWhen } from "@/lib/tip-cycle";
 
@@ -15,6 +17,6 @@ export async function POST(request: Request) {
     const result = await confirmTipWhen(child, json?.id ?? "", json.when);
     return NextResponse.json({ ok: true, ...result });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "No se pudo enviar el Tip." }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

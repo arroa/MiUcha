@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { jsonErrorResponse } from "@/lib/http-errors";
+
 import { getChildSession } from "@/lib/child-account";
 import { submitTask } from "@/lib/tip-cycle";
 
@@ -11,6 +13,6 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     await submitTask(child, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "No se pudo marcar la tarea." }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

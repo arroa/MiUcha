@@ -12,6 +12,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "setup:admin": "tsx scripts/setup-admin.ts",
+    "db:indexes": "tsx scripts/ensure-indexes.ts",
     "icons:pwa": "node scripts/generate-pwa-icons.mjs"
   },
   "dependencies": {

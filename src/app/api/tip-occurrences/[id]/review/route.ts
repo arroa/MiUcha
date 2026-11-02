@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { jsonErrorResponse } from "@/lib/http-errors";
+
 import { requireFamilyAdult } from "@/lib/family-admin";
 import { reviewTask } from "@/lib/tip-cycle";
 
@@ -18,6 +20,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await reviewTask(adult.familyId, adult.adultId, id, decision, json?.note ?? "");
     return NextResponse.json({ ok: true });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "No se pudo revisar la tarea." }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

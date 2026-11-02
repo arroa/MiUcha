@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAdultSession } from "@/lib/adult-session";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { createFamily, listPanelFamilies, requireSuperAdmin } from "@/lib/family-admin";
 
 export async function GET() {
@@ -32,6 +32,6 @@ export async function POST(request: Request) {
     });
     return NextResponse.json({ ok: true, family }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

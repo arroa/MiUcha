@@ -1,4 +1,4 @@
-import { MongoServerError, ObjectId, type ClientSession } from "mongodb";
+import { ObjectId, type ClientSession } from "mongodb";
 
 import { getChildSession } from "@/lib/child-account";
 import {
@@ -66,34 +66,21 @@ function parseAmount(raw: unknown) {
   return amount;
 }
 
-export async function inMoneySession(work: (session?: ClientSession) => Promise<void>) {
+/**
+ * Ejecuta trabajo monetario dentro de una transacción multi-documento.
+ * No hay fallback sin transacción: ante fallos transitorios la operación aborta
+ * completa (atomicidad). La idempotencia queda en operationId / filtros de estado.
+ */
+export async function inMoneySession(work: (session: ClientSession) => Promise<void>) {
   const client = await getMongoClient();
   const session = client.startSession();
   try {
     await session.withTransaction(async () => {
       await work(session);
     });
-  } catch (error) {
-    if (!isStandalone(error)) throw error;
-    await work(undefined);
   } finally {
     await session.endSession();
   }
-}
-
-function isStandalone(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  if (error instanceof MongoServerError && (error.code === 20 || error.codeName === "IllegalOperation")) return true;
-  const message = "message" in error && typeof error.message === "string" ? error.message : "";
-  if (
-    message.includes("replica set") ||
-    message.includes("Transaction numbers") ||
-    message.includes("retryable writes") ||
-    message.includes("retryWrites")
-  ) {
-    return true;
-  }
-  return "cause" in error ? isStandalone(error.cause) : false;
 }
 
 async function reservedByWallet(familyId: ObjectId, childId: ObjectId, session?: ClientSession) {
@@ -240,7 +227,7 @@ export async function cancelWithdrawal(requestId: string, actor: { familyId: Obj
 export async function completeWithdrawal(familyId: string, banqueroId: string, requestId: string) {
   if (!ObjectId.isValid(requestId) || !ObjectId.isValid(banqueroId)) throw new Error("Pedido no encontrado.");
   await inMoneySession(async (session) => {
-    const options = session ? { session } : {};
+    const options = { session };
     const col = await withdrawalRequests();
     const request = await col.findOne(
       { _id: new ObjectId(requestId), familyId: new ObjectId(familyId), status: "pending" },
@@ -307,7 +294,7 @@ export async function transferGastoToInversion(child: Child, input: unknown) {
 
     const now = new Date();
     const operationId = `transfer:${new ObjectId().toHexString()}`;
-    const options = session ? { session } : {};
+    const options = { session };
     const actorId = child._id.toHexString();
 
     const debited = await (await wallets()).updateOne(
@@ -485,7 +472,7 @@ export async function cancelDeposit(requestId: string, actor: { familyId: Object
 export async function completeDeposit(familyId: string, banqueroId: string, requestId: string) {
   if (!ObjectId.isValid(requestId) || !ObjectId.isValid(banqueroId)) throw new Error("Aporte no encontrado.");
   await inMoneySession(async (session) => {
-    const options = session ? { session } : {};
+    const options = { session };
     const col = await depositRequests();
     const request = await col.findOne(
       { _id: new ObjectId(requestId), familyId: new ObjectId(familyId), status: "pending" },

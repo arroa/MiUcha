@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { requireBanquero } from "@/lib/family-admin";
 import { createCustomFamilyTip, createFamilyTip, listFamilyTips, saveFamilyCatalog } from "@/lib/tips";
 
@@ -19,7 +19,7 @@ export async function PUT(request: Request) {
     const tips = await saveFamilyCatalog(session.familyId, await request.json().catch(() => null));
     return NextResponse.json({ ok: true, tips });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }
 
@@ -34,6 +34,6 @@ export async function POST(request: Request) {
       : await createFamilyTip(session.familyId, json);
     return NextResponse.json({ ok: true, tip }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

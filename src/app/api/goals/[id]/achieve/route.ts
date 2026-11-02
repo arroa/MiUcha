@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getChildSession } from "@/lib/child-account";
-import { formatClerkError } from "@/lib/clerk-users";
+import { jsonErrorResponse } from "@/lib/http-errors";
 import { achieveGoalForChild } from "@/lib/goals";
 
 type Params = { params: Promise<{ id: string }> };
@@ -15,6 +15,6 @@ export async function POST(_request: Request, { params }: Params) {
     const goal = await achieveGoalForChild(child, id);
     return NextResponse.json({ ok: true, goal });
   } catch (error) {
-    return NextResponse.json({ error: formatClerkError(error) }, { status: 400 });
+    return jsonErrorResponse(error);
   }
 }

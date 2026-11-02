@@ -25,7 +25,8 @@ function isPublic(pathname: string) {
     pathname.startsWith("/api/auth/dev-logout") ||
     pathname.startsWith("/api/child-auth/login") ||
     pathname.startsWith("/api/child-auth/logout") ||
-    pathname.startsWith("/api/cron")
+    pathname.startsWith("/api/cron") ||
+    pathname === "/api/health"
   );
 }
 
