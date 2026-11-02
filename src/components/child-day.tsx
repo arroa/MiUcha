@@ -3,7 +3,9 @@
 import { PartyPopper } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
+import { MIHUCHA_ARREGLAR_TIP, type ArreglarTipDetail } from "@/lib/child-events";
 import { tipIconFor } from "@/lib/tip-icons";
 import type { TaskView, TipWhen } from "@/lib/tip-cycle";
 
@@ -28,6 +30,21 @@ export function TaskCart({
   useEffect(() => {
     setRows(tasks);
   }, [tasks]);
+
+  useEffect(() => {
+    function onArreglar(event: Event) {
+      const id = (event as CustomEvent<ArreglarTipDetail>).detail?.id;
+      if (!id) return;
+      const task = rows.find(
+        (row) => row.id === id && (row.status === "available" || row.status === "needs_improvement"),
+      );
+      if (!task) return;
+      setError("");
+      setActive(task);
+    }
+    window.addEventListener(MIHUCHA_ARREGLAR_TIP, onArreglar);
+    return () => window.removeEventListener(MIHUCHA_ARREGLAR_TIP, onArreglar);
+  }, [rows]);
 
   const openTasks = useMemo(
     () => rows.filter((task) => task.status === "available" || task.status === "needs_improvement"),
@@ -71,9 +88,9 @@ export function TaskCart({
   }
 
   return (
-    <section className="yo-rise-2 relative">
+    <section id="mis-tips" className="yo-rise-2 relative scroll-mt-6">
       <h3 className="text-2xl font-extrabold leading-tight">Mis Tips de hoy</h3>
-      <p className="mt-0.5 text-sm text-muted">Cuando termines uno, toca Lo hice.</p>
+      <p className="mt-0.5 text-sm text-muted">Cuando termines uno, toca Lo hice. Si te pidieron mejorar, toca Lo arreglé.</p>
 
       {rows.length === 0 ? <p className="mt-4 text-muted">Hoy no tienes Tips.</p> : null}
 
@@ -129,12 +146,13 @@ function TipRow({
   onLoHice?: () => void;
 }) {
   const Icon = tipIconFor({ title: task.title });
-  const note = task.status === "needs_improvement" ? task.reviewNote : "";
+  const retry = task.status === "needs_improvement";
+  const note = retry ? task.reviewNote : "";
 
   return (
-    <li className={celebrating ? "tip-celebrate" : undefined}>
+    <li id={open ? `tip-${task.id}` : undefined} className={celebrating ? "tip-celebrate" : undefined}>
       {open ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-card px-3 py-3 shadow-sm">
+        <div className={`flex items-center gap-3 rounded-2xl border px-3 py-3 shadow-sm ${retry ? "border-amber-300 bg-amber-50" : "border-line bg-card"}`}>
           <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-[#efe9ff] text-accent">
             <Icon className="size-5" aria-hidden />
           </span>
@@ -149,7 +167,7 @@ function TipRow({
             onClick={onLoHice}
             className="shrink-0 rounded-xl bg-accent px-3 py-2 text-sm font-extrabold text-white disabled:opacity-50"
           >
-            Lo hice
+            {retry ? "Lo arreglé" : "Lo hice"}
           </button>
         </div>
       ) : (
@@ -184,7 +202,9 @@ function LoHiceModal({
   onConfirm: (when: TipWhen) => Promise<void>;
 }) {
   const titleId = useId();
-  const [when, setWhen] = useState<TipWhen | null>(null);
+  const canAyer = task.canConfirmYesterday === true;
+  const retry = task.status === "needs_improvement";
+  const [when, setWhen] = useState<TipWhen | null>(canAyer ? null : "hoy");
   const who = formatNames(reviewerNames);
 
   useEffect(() => {
@@ -195,8 +215,10 @@ function LoHiceModal({
     return () => document.removeEventListener("keydown", onKey);
   }, [busy, onClose]);
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -209,18 +231,24 @@ function LoHiceModal({
           ✕
         </button>
 
-        <div className="flex items-center gap-2 text-accent">
-          <PartyPopper className="size-6" aria-hidden />
-          <p className="text-sm font-bold">¡Qué orgullo!</p>
+        <div className="flex flex-col items-center gap-2 text-center text-accent">
+          <PartyPopper className="size-10" aria-hidden />
+          <p className="text-2xl font-extrabold tracking-tight">¡Qué orgullo!</p>
         </div>
-        <h2 id={titleId} className="mt-2 text-2xl font-extrabold leading-tight">
-          ¿Lo hiciste hoy o ayer?
-        </h2>
-        <p className="mt-2 text-sm text-muted">
+        <p className="mt-4 text-center text-base text-muted">
           Completaste <span className="font-bold text-foreground">{task.title}</span> (+{pesos(task.amountMinor)}).
         </p>
+        <h2 id={titleId} className="mt-3 text-center text-xl font-extrabold leading-tight text-foreground">
+          {retry
+            ? canAyer
+              ? "¿Lo arreglaste hoy o ayer?"
+              : "¿Lo arreglaste hoy?"
+            : canAyer
+              ? "¿Lo hiciste hoy o ayer?"
+              : "¿Lo hiciste hoy?"}
+        </h2>
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className={`mt-4 grid gap-2 ${canAyer ? "grid-cols-2" : "grid-cols-1"}`}>
           <button
             type="button"
             disabled={busy}
@@ -229,14 +257,16 @@ function LoHiceModal({
           >
             Hoy
           </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => setWhen("ayer")}
-            className={`rounded-2xl border-2 px-3 py-3 font-extrabold ${when === "ayer" ? "border-accent bg-[#efe9ff] text-accent" : "border-line bg-white"}`}
-          >
-            Ayer
-          </button>
+          {canAyer ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setWhen("ayer")}
+              className={`rounded-2xl border-2 px-3 py-3 font-extrabold ${when === "ayer" ? "border-accent bg-[#efe9ff] text-accent" : "border-line bg-white"}`}
+            >
+              Ayer
+            </button>
+          ) : null}
         </div>
 
         <p className="mt-4 rounded-2xl bg-[#efe9ff] px-4 py-3 text-sm font-bold text-[#5b45c4]">
@@ -263,7 +293,8 @@ function LoHiceModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

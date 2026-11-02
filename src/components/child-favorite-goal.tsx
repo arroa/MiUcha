@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Target } from "lucide-react";
+import { ExternalLink, Plus, Target } from "lucide-react";
 
 import { goalIconDef } from "@/lib/goal-icons";
 import type { GoalView } from "@/lib/goals";
@@ -8,6 +8,7 @@ function pesos(amount: number) {
   return `$${amount.toLocaleString("es-CL")}`;
 }
 
+/** Atajo al favorito. Descripción y tienda viven aquí; el detalle completo en /yo/objetivos/[id]. */
 export function ChildFavoriteGoal({
   favorite,
   hasActiveGoals,
@@ -29,7 +30,7 @@ export function ChildFavoriteGoal({
             </h2>
             <p className="mt-1 text-sm text-muted">
               {hasActiveGoals
-                ? "Marca uno como favorito para verlo aquí arriba."
+                ? "Marca uno como favorito en Mis objetivos."
                 : "Guarda algo que quieras y mira cuánto te falta con tu plata de Gasto e Inversión."}
             </p>
           </div>
@@ -46,26 +47,45 @@ export function ChildFavoriteGoal({
   }
 
   const Icon = goalIconDef(favorite.iconId).Icon;
+  const detailHref = `/yo/objetivos/${favorite.id}`;
+  const description = favorite.description.trim();
 
   return (
-    <section className="yo-rise flex h-full flex-col rounded-[1.75rem] bg-card p-5 shadow-[0_12px_40px_rgba(109,76,255,0.12)]">
+    <section className="yo-rise flex h-full flex-col rounded-[1.75rem] bg-card p-5 shadow-[0_12px_40px_rgba(109,76,255,0.12)] transition hover:shadow-[0_14px_44px_rgba(109,76,255,0.18)]">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <Link
+          href={detailHref}
+          className="min-w-0 flex-1 outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
+        >
           <h2 className="text-2xl font-extrabold leading-tight">{favorite.name}</h2>
-          <div className="mt-1 flex items-center justify-between gap-2">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted">Mi objetivo favorito</p>
-            <Link href="/yo/objetivos" className="shrink-0 text-xs font-bold text-accent">
-              Ver todos
-            </Link>
-          </div>
-        </div>
-        <Link href={`/yo/objetivos/${favorite.id}`} className="shrink-0">
-          <span className="grid size-16 place-items-center rounded-2xl bg-[#efe9ff] text-accent">
-            <Icon className="size-8" aria-hidden />
-          </span>
+          <p className="mt-1 text-xs font-bold uppercase tracking-wider text-muted">Mi objetivo favorito</p>
         </Link>
+        <div className="flex shrink-0 items-start gap-2">
+          <Link
+            href={detailHref}
+            className="grid size-16 place-items-center rounded-2xl bg-accent text-white outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
+            aria-label={`Ver ${favorite.name}`}
+          >
+            <Icon className="size-8" aria-hidden />
+          </Link>
+          {favorite.productUrl ? (
+            <a
+              href={favorite.productUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Ver en tienda"
+              className="grid size-10 place-items-center rounded-xl bg-[#e8f0ff] text-[#0055ff] outline-none transition hover:bg-[#d9e6ff] focus-visible:ring-2 focus-visible:ring-[#0055ff]/40 focus-visible:ring-offset-2"
+            >
+              <ExternalLink className="size-5" aria-hidden />
+            </a>
+          ) : null}
+        </div>
       </div>
-      <Link href={`/yo/objetivos/${favorite.id}`} className="mt-4 flex flex-1 flex-col">
+
+      <Link
+        href={detailHref}
+        className="mt-4 flex min-h-0 flex-1 flex-col outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2"
+      >
         <div className="grid grid-cols-3 gap-2 text-center">
           <div>
             <p className="text-[10px] font-bold uppercase text-muted">Precio</p>
@@ -80,13 +100,20 @@ export function ChildFavoriteGoal({
             <p className="mt-0.5 text-sm font-extrabold text-accent">{pesos(favorite.missingMinor)}</p>
           </div>
         </div>
-        <div className="mt-4 h-7 overflow-hidden rounded-full bg-[#ebe4ff]">
+        <div className="relative mt-4 h-7 overflow-hidden rounded-full bg-[#ebe4ff]">
           <div
             className="h-full rounded-full bg-gradient-to-r from-[#8b6cff] to-accent transition-[width] duration-700"
             style={{ width: `${favorite.progressPercent}%` }}
           />
+          <span
+            className={`absolute inset-y-0 right-3 flex items-center text-xs font-extrabold tabular-nums ${
+              favorite.progressPercent >= 85 ? "text-white" : "text-accent"
+            }`}
+          >
+            {favorite.progressPercent}%
+          </span>
         </div>
-        <p className="mt-2 text-right text-xs font-bold text-accent">{favorite.progressPercent}%</p>
+        {description ? <p className="mt-3 line-clamp-2 text-sm text-muted">{description}</p> : null}
       </Link>
     </section>
   );

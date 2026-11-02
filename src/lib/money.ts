@@ -3,21 +3,27 @@ import { MongoServerError, ObjectId, type ClientSession } from "mongodb";
 import { getChildSession } from "@/lib/child-account";
 import {
   children,
+  depositRequests,
   ledgerEntries,
   wallets,
   withdrawalRequests,
   type Child,
+  type DepositRequest,
+  type DepositStatus,
   type WalletType,
   type WithdrawalRequest,
   type WithdrawalStatus,
 } from "@/lib/collections";
 import { requireBanquero, requireFamilyAdult } from "@/lib/family-admin";
+import { bumpFamilySync } from "@/lib/family-sync";
 import { getMongoClient } from "@/lib/mongodb";
 
 import { WALLET_LABELS, WALLET_TYPES } from "@/lib/wallet-labels";
 
-export type { WalletType, WithdrawalStatus };
+export type { WalletType, WithdrawalStatus, DepositStatus };
 export { WALLET_LABELS, WALLET_TYPES };
+
+const DEPOSIT_AMOUNT_MAX = 50_000_000;
 
 export type WalletView = {
   type: WalletType;
@@ -34,6 +40,18 @@ export type WithdrawalView = {
   amountMinor: number;
   note: string;
   status: WithdrawalStatus;
+  createdAt: string;
+  completedAt: string | null;
+};
+
+export type DepositView = {
+  id: string;
+  childId: string;
+  childName: string;
+  walletType: WalletType;
+  amountMinor: number;
+  note: string;
+  status: DepositStatus;
   createdAt: string;
   completedAt: string | null;
 };
@@ -199,6 +217,7 @@ export async function requestWithdrawal(child: Child, input: unknown): Promise<W
     banqueroId: null,
   };
   await (await withdrawalRequests()).insertOne(doc);
+  await bumpFamilySync(child.familyId);
   return toWithdrawalView(doc, child.name);
 }
 
@@ -215,6 +234,7 @@ export async function cancelWithdrawal(requestId: string, actor: { familyId: Obj
     $set: { status: "cancelled", completedAt: new Date() },
   });
   if (!result.matchedCount) throw new Error("Ese pedido ya no se puede cancelar.");
+  await bumpFamilySync(actor.familyId);
 }
 
 export async function completeWithdrawal(familyId: string, banqueroId: string, requestId: string) {
@@ -270,6 +290,7 @@ export async function completeWithdrawal(familyId: string, banqueroId: string, r
       options,
     );
     if (!debited.modifiedCount) throw new Error("El saldo ya no alcanza para entregar ese pedido.");
+    await bumpFamilySync(request.familyId, session);
   });
 }
 
@@ -335,6 +356,7 @@ export async function transferGastoToInversion(child: Child, input: unknown) {
       ],
       options,
     );
+    await bumpFamilySync(child.familyId, session);
   });
 }
 
@@ -356,58 +378,6 @@ export async function completeWithdrawalForBanquero(requestId: string) {
   await completeWithdrawal(adult.familyId, adult.adultId, requestId);
 }
 
-export async function creditRentabilidad(familyId: string, banqueroId: string, childId: string, input: unknown) {
-  if (!ObjectId.isValid(childId) || !ObjectId.isValid(banqueroId)) throw new Error("Niño no encontrado.");
-  const json = (input ?? {}) as { amountMinor?: unknown; note?: unknown };
-  const amountMinor = parseAmount(json.amountMinor);
-  const note = typeof json.note === "string" ? json.note.trim() : "";
-  if (note.length > 160) throw new Error("La nota es demasiado larga.");
-
-  const familyObjectId = new ObjectId(familyId);
-  const childObjectId = new ObjectId(childId);
-  const child = await (await children()).findOne({ _id: childObjectId, familyId: familyObjectId, active: true });
-  if (!child) throw new Error("Niño no encontrado.");
-
-  await inMoneySession(async (session) => {
-    const options = session ? { session } : {};
-    const now = new Date();
-    const operationId = `interest:${new ObjectId().toHexString()}`;
-    const credited = await (await wallets()).updateOne(
-      { familyId: familyObjectId, childId: childObjectId, type: "inversion" },
-      { $inc: { balanceMinor: amountMinor }, $set: { updatedAt: now } },
-      options,
-    );
-    if (!credited.matchedCount) throw new Error("Falta la Hucha de Inversión.");
-    await (await ledgerEntries()).insertOne(
-      {
-        _id: new ObjectId(),
-        familyId: familyObjectId,
-        childId: childObjectId,
-        walletType: "inversion",
-        amountMinor,
-        kind: "interest",
-        operationId,
-        actorId: banqueroId,
-        createdAt: now,
-      },
-      options,
-    );
-  });
-
-  return {
-    childId: child._id.toHexString(),
-    childName: child.name,
-    amountMinor,
-    note,
-    walletType: "inversion" as const,
-  };
-}
-
-export async function creditRentabilidadForBanquero(childId: string, input: unknown) {
-  const adult = await requireBanquero();
-  if (!adult?.familyId || !adult.adultId) throw new Error("No autorizado.");
-  return creditRentabilidad(adult.familyId, adult.adultId, childId, input);
-}
 
 export async function cancelWithdrawalForActor(requestId: string) {
   const child = await getChildSession();
@@ -418,4 +388,169 @@ export async function cancelWithdrawalForActor(requestId: string) {
   const adult = await requireBanquero();
   if (!adult?.familyId) throw new Error("No autorizado.");
   await cancelWithdrawal(requestId, { familyId: new ObjectId(adult.familyId), adultId: adult.adultId ?? undefined });
+}
+
+function toDepositView(row: DepositRequest, childName: string): DepositView {
+  return {
+    id: row._id.toHexString(),
+    childId: row.childId.toHexString(),
+    childName,
+    walletType: row.walletType,
+    amountMinor: row.amountMinor,
+    note: row.note,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? null,
+  };
+}
+
+async function withDepositChildNames(rows: DepositRequest[]): Promise<DepositView[]> {
+  const ids = rows.map((row) => row.childId);
+  const kids = ids.length ? await (await children()).find({ _id: { $in: ids } }).toArray() : [];
+  const names = new Map(kids.map((child) => [child._id.toHexString(), child.name]));
+  return rows.map((row) => toDepositView(row, names.get(row.childId.toHexString()) ?? ""));
+}
+
+export async function listPendingDeposits(familyId: string): Promise<DepositView[]> {
+  const rows = await (await depositRequests())
+    .find({ familyId: new ObjectId(familyId), status: "pending" })
+    .sort({ createdAt: 1 })
+    .toArray();
+  return withDepositChildNames(rows);
+}
+
+export async function listRecentDeposits(familyId: string): Promise<DepositView[]> {
+  const rows = await (await depositRequests())
+    .find({ familyId: new ObjectId(familyId), status: { $in: ["completed", "cancelled"] } })
+    .sort({ createdAt: -1 })
+    .limit(40)
+    .toArray();
+  return withDepositChildNames(rows);
+}
+
+export async function listChildDeposits(child: Child): Promise<DepositView[]> {
+  const rows = await (await depositRequests())
+    .find({ childId: child._id, status: { $in: ["pending", "completed", "cancelled"] } })
+    .sort({ createdAt: -1 })
+    .limit(20)
+    .toArray();
+  return rows.map((row) => toDepositView(row, child.name));
+}
+
+export async function requestDeposit(child: Child, input: unknown): Promise<DepositView> {
+  const json = (input ?? {}) as { walletType?: unknown; amountMinor?: unknown; note?: unknown };
+  if (!isWalletType(json.walletType)) throw new Error("Elige a qué Hucha va el aporte.");
+  if (json.walletType === "donaciones") throw new Error("A Generosidad no se aporta: esa Hucha es para dar.");
+  const amountMinor = parseAmount(json.amountMinor);
+  if (amountMinor > DEPOSIT_AMOUNT_MAX) {
+    throw new Error(`El aporte puede ser hasta $${DEPOSIT_AMOUNT_MAX.toLocaleString("es-CL")}.`);
+  }
+  const note = typeof json.note === "string" ? json.note.trim() : "";
+  if (note.length > 160) throw new Error("La nota es demasiado larga.");
+
+  const now = new Date();
+  const doc: DepositRequest = {
+    _id: new ObjectId(),
+    familyId: child.familyId,
+    childId: child._id,
+    walletType: json.walletType,
+    amountMinor,
+    note,
+    status: "pending",
+    createdAt: now,
+    completedAt: null,
+    banqueroId: null,
+  };
+  await (await depositRequests()).insertOne(doc);
+  await bumpFamilySync(child.familyId);
+  return toDepositView(doc, child.name);
+}
+
+export async function cancelDeposit(requestId: string, actor: { familyId: ObjectId; childId?: ObjectId; adultId?: string }) {
+  if (!ObjectId.isValid(requestId)) throw new Error("Aporte no encontrado.");
+  const filter: Record<string, unknown> = {
+    _id: new ObjectId(requestId),
+    familyId: actor.familyId,
+    status: "pending",
+  };
+  if (actor.childId) filter.childId = actor.childId;
+
+  const result = await (await depositRequests()).updateOne(filter, {
+    $set: { status: "cancelled", completedAt: new Date() },
+  });
+  if (!result.matchedCount) throw new Error("Ese aporte ya no se puede cancelar.");
+  await bumpFamilySync(actor.familyId);
+}
+
+export async function completeDeposit(familyId: string, banqueroId: string, requestId: string) {
+  if (!ObjectId.isValid(requestId) || !ObjectId.isValid(banqueroId)) throw new Error("Aporte no encontrado.");
+  await inMoneySession(async (session) => {
+    const options = session ? { session } : {};
+    const col = await depositRequests();
+    const request = await col.findOne(
+      { _id: new ObjectId(requestId), familyId: new ObjectId(familyId), status: "pending" },
+      options,
+    );
+    if (!request) throw new Error("Ese aporte ya no está pendiente.");
+
+    const now = new Date();
+    const flipped = await col.updateOne(
+      { _id: request._id, status: "pending" },
+      { $set: { status: "completed", completedAt: now, banqueroId: new ObjectId(banqueroId) } },
+      options,
+    );
+    if (!flipped.modifiedCount) throw new Error("Ese aporte ya no está pendiente.");
+
+    const operationId = `deposit:${request._id.toHexString()}`;
+    await (await ledgerEntries()).insertOne(
+      {
+        _id: new ObjectId(),
+        familyId: request.familyId,
+        childId: request.childId,
+        walletType: request.walletType,
+        amountMinor: request.amountMinor,
+        kind: "deposit",
+        operationId,
+        actorId: banqueroId,
+        createdAt: now,
+      },
+      options,
+    );
+    const credited = await (await wallets()).updateOne(
+      { familyId: request.familyId, childId: request.childId, type: request.walletType },
+      { $inc: { balanceMinor: request.amountMinor }, $set: { updatedAt: now } },
+      options,
+    );
+    if (!credited.matchedCount) throw new Error("Falta la Hucha de este niño.");
+    await bumpFamilySync(request.familyId, session);
+  });
+}
+
+export async function pendingDepositsForAdult() {
+  const adult = await requireFamilyAdult();
+  if (!adult?.familyId) return null;
+  return { familyId: adult.familyId, role: adult.role, deposits: await listPendingDeposits(adult.familyId) };
+}
+
+export async function historyDepositsForAdult() {
+  const adult = await requireFamilyAdult();
+  if (!adult?.familyId) return null;
+  return { deposits: await listRecentDeposits(adult.familyId) };
+}
+
+export async function completeDepositForBanquero(requestId: string) {
+  const adult = await requireBanquero();
+  if (!adult?.familyId || !adult.adultId) throw new Error("No autorizado.");
+  await completeDeposit(adult.familyId, adult.adultId, requestId);
+}
+
+export async function cancelDepositForActor(requestId: string) {
+  const child = await getChildSession();
+  if (child) {
+    await cancelDeposit(requestId, { familyId: child.familyId, childId: child._id });
+    return;
+  }
+  const adult = await requireBanquero();
+  if (!adult?.familyId) throw new Error("No autorizado.");
+  await cancelDeposit(requestId, { familyId: new ObjectId(adult.familyId), adultId: adult.adultId ?? undefined });
 }

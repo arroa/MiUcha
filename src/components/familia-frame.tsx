@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { FamilyAdmin } from "@/components/family-admin";
+import { LiveSync } from "@/components/live-sync";
 import { AdultSignOut } from "@/components/sign-out";
 import type { TipView } from "@/lib/tips";
 
@@ -13,6 +14,7 @@ type FamilyDetail = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
+  interestPercent: number;
 };
 
 type ChildItem = { id: string; name: string; birthDate: string; loginId: string };
@@ -47,6 +49,7 @@ export function FamiliaFrame({
 
   return (
     <div className="min-h-full">
+      <LiveSync />
       <header className="sticky top-0 z-30 border-b border-line bg-background">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-6 py-4">
           <div className="min-w-0">

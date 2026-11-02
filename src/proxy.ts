@@ -71,9 +71,12 @@ export async function proxy(request: NextRequest, event: NextFetchEvent) {
     (pathname.startsWith("/api/tip-occurrences") ||
       pathname.startsWith("/api/wallets") ||
       pathname.startsWith("/api/withdrawals") ||
+      pathname.startsWith("/api/deposits") ||
       pathname.startsWith("/api/transfers") ||
       pathname.startsWith("/api/child-news") ||
-      pathname.startsWith("/api/goals")) &&
+      pathname.startsWith("/api/goals") ||
+      pathname.startsWith("/api/sync") ||
+      pathname.startsWith("/api/movements")) &&
     (await readChildSessionFromRequest(request))
   ) {
     return NextResponse.next();

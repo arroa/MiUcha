@@ -14,6 +14,7 @@ import {
   type TipOccurrenceStatus,
 } from "@/lib/collections";
 import { requireFamilyAdult } from "@/lib/family-admin";
+import { bumpFamilySync } from "@/lib/family-sync";
 import { inMoneySession } from "@/lib/money";
 import { addDays, santiagoToday, weekdayOf } from "@/lib/santiago-date";
 
@@ -27,6 +28,12 @@ export type TaskView = {
   childName: string;
   occurrenceDate: string;
   read: boolean;
+  /** Si se puede marcar como hecho ayer (misma definición, ocurrencia de ayer abierta). */
+  canConfirmYesterday?: boolean;
+  /** Vuelve a revisión tras un Mejorable. */
+  isRetry?: boolean;
+  /** Comentario del Mejorable anterior. */
+  previousReviewNote?: string;
 };
 
 export type TipWhen = "hoy" | "ayer";
@@ -86,7 +93,34 @@ export async function ensureTasksForDate(child: Child, date: string): Promise<Ta
 }
 
 export async function ensureTodayTasks(child: Child) {
-  return ensureTasksForDate(child, santiagoToday().date);
+  const today = santiagoToday().date;
+  const views = await ensureTasksForDate(child, today);
+  const yesterday = addDays(today, -1);
+  await ensureTasksForDate(child, yesterday);
+
+  const open = views.filter((row) => row.status === "available" || row.status === "needs_improvement");
+  if (open.length === 0) return views;
+
+  const defIds = open.map((row) => new ObjectId(row.definitionId));
+  const yRows = await (await tipOccurrences())
+    .find({
+      childId: child._id,
+      occurrenceDate: yesterday,
+      definitionId: { $in: defIds },
+    })
+    .project({ definitionId: 1, status: 1 })
+    .toArray();
+  const canAyer = new Map(
+    yRows.map((row) => [
+      row.definitionId.toHexString(),
+      row.status === "available" || row.status === "needs_improvement",
+    ]),
+  );
+
+  return views.map((row) => ({
+    ...row,
+    canConfirmYesterday: canAyer.get(row.definitionId) === true,
+  }));
 }
 
 export async function ensureAllTodayTasks() {
@@ -112,16 +146,30 @@ export async function confirmDay(child: Child, date: string, ids: string[]) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today) throw new Error("Ese día no se puede confirmar.");
   const unique = [...new Set(ids)].filter((id) => ObjectId.isValid(id));
   if (unique.length === 0) throw new Error("Marca las tareas que hiciste.");
-  const result = await (await tipOccurrences()).updateMany(
-    {
+  const col = await tipOccurrences();
+  const rows = await col
+    .find({
       _id: { $in: unique.map((id) => new ObjectId(id)) },
       childId: child._id,
       occurrenceDate: date,
       status: { $in: ["available", "needs_improvement"] },
-    },
-    { $set: { status: "submitted", submittedAt: new Date(), reviewNote: "" } },
-  );
-  if (!result.matchedCount) throw new Error("Esas tareas ya no se pueden confirmar.");
+    })
+    .toArray();
+  if (rows.length === 0) throw new Error("Esas tareas ya no se pueden confirmar.");
+  const now = new Date();
+  for (const row of rows) {
+    const patch: Record<string, unknown> = {
+      status: "submitted",
+      submittedAt: now,
+      reviewNote: "",
+    };
+    if (row.status === "needs_improvement") {
+      const previous = row.reviewNote.trim();
+      if (previous) patch.previousReviewNote = previous;
+    }
+    await col.updateOne({ _id: row._id, status: row.status }, { $set: patch });
+  }
+  await bumpFamilySync(child.familyId);
 }
 
 /** Confirma un Tip indicando si fue hoy o ayer (sin calendario). */
@@ -197,11 +245,25 @@ export async function listReviewedTasks(familyId: string): Promise<TaskView[]> {
 
 export async function submitTask(child: Child, taskId: string) {
   if (!ObjectId.isValid(taskId)) throw new Error("Tarea no encontrada.");
-  const result = await (await tipOccurrences()).updateOne(
-    { _id: new ObjectId(taskId), childId: child._id, status: { $in: ["available", "needs_improvement"] } },
-    { $set: { status: "submitted", submittedAt: new Date(), reviewNote: "" } },
-  );
+  const col = await tipOccurrences();
+  const row = await col.findOne({
+    _id: new ObjectId(taskId),
+    childId: child._id,
+    status: { $in: ["available", "needs_improvement"] },
+  });
+  if (!row) throw new Error("Esta tarea ya no se puede marcar.");
+  const patch: Record<string, unknown> = {
+    status: "submitted",
+    submittedAt: new Date(),
+    reviewNote: "",
+  };
+  if (row.status === "needs_improvement") {
+    const previous = row.reviewNote.trim();
+    if (previous) patch.previousReviewNote = previous;
+  }
+  const result = await col.updateOne({ _id: row._id, status: row.status }, { $set: patch });
   if (!result.matchedCount) throw new Error("Esta tarea ya no se puede marcar.");
+  await bumpFamilySync(child.familyId);
 }
 
 export async function reviewTask(
@@ -226,14 +288,18 @@ export async function reviewTask(
       { _id: occurrence._id, status: "submitted" },
       {
         $set: { status, reviewNote, reviewedAt: new Date(), reviewerId: new ObjectId(adultId) },
-        $unset: { newsReadAt: "", newsDismissedAt: "" },
+        $unset: { newsReadAt: "", newsDismissedAt: "", previousReviewNote: "" },
       },
     );
     if (!result.modifiedCount) throw new Error("Esta tarea ya no está por revisar.");
+    await bumpFamilySync(occurrence.familyId);
     return;
   }
 
-  await inMoneySession((session) => payTip(occurrence, adultId, session));
+  await inMoneySession(async (session) => {
+    await payTip(occurrence, adultId, session);
+    await bumpFamilySync(occurrence.familyId, session);
+  });
 }
 
 async function payTip(occurrence: TipOccurrence, adultId: string, session?: ClientSession) {
@@ -246,7 +312,7 @@ async function payTip(occurrence: TipOccurrence, adultId: string, session?: Clie
     { _id: occurrence._id, status: "submitted" },
     {
       $set: { status: "approved", reviewedAt: now, reviewerId: new ObjectId(adultId), reviewNote: "" },
-      $unset: { newsReadAt: "", newsDismissedAt: "" },
+      $unset: { newsReadAt: "", newsDismissedAt: "", previousReviewNote: "" },
     },
     options,
   );
@@ -279,6 +345,10 @@ async function payTip(occurrence: TipOccurrence, adultId: string, session?: Clie
 }
 
 function toView(row: TipOccurrence, childName: string): TaskView {
+  const previousReviewNote = typeof row.previousReviewNote === "string" ? row.previousReviewNote.trim() : "";
+  const isRetry =
+    Boolean(previousReviewNote) ||
+    (row.status === "submitted" && Boolean(row.reviewedAt));
   return {
     id: row._id.toHexString(),
     definitionId: row.definitionId.toHexString(),
@@ -289,6 +359,8 @@ function toView(row: TipOccurrence, childName: string): TaskView {
     childName,
     occurrenceDate: row.occurrenceDate,
     read: Boolean(row.newsReadAt),
+    isRetry,
+    previousReviewNote: previousReviewNote || undefined,
   };
 }
 

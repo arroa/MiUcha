@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowUpRight, Heart, ShoppingCart, TrendingUp } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Heart, ShoppingCart, TrendingUp } from "lucide-react";
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
-import type { WalletView, WithdrawalView } from "@/lib/money";
-import { parsePesosInput } from "@/lib/pesos-input";
+import { FAMILY_SYNC_EVENT } from "@/components/live-sync";
+import type { DepositView, WalletView, WithdrawalView } from "@/lib/money";
+import { formatPesosGrouped, parsePesosInput } from "@/lib/pesos-input";
 import { UI_TOAST_DURATION_MS } from "@/lib/ui";
 import { WALLET_LABELS, type WalletType } from "@/lib/wallet-labels";
 
@@ -14,6 +16,9 @@ function pesos(amount: number) {
 
 /** Orden Soft Quest: Gasto · Inversión · Generosidad */
 const ORDER: WalletType[] = ["gasto", "inversion", "donaciones"];
+
+/** Aportes externos solo a Gasto o Inversión (Generosidad es para dar, no para meter plata). */
+const APORTAR_WALLETS: WalletType[] = ["gasto", "inversion"];
 
 const WALLET_META: Record<WalletType, { tone: string; icon: ReactNode }> = {
   gasto: {
@@ -33,9 +38,10 @@ const WALLET_META: Record<WalletType, { tone: string; icon: ReactNode }> = {
 export function ChildWallets({ initial }: { initial: WalletView[] }) {
   const [wallets, setWallets] = useState(initial);
   const [pending, setPending] = useState<WithdrawalView[]>([]);
+  const [pendingDeposits, setPendingDeposits] = useState<DepositView[]>([]);
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
-  const [action, setAction] = useState<"retirar" | "transferir" | null>(null);
+  const [action, setAction] = useState<"retirar" | "transferir" | "aportar" | null>(null);
   const [focus, setFocus] = useState<WalletType | null>(null);
   const [busyLock, setBusyLock] = useState(false);
 
@@ -45,15 +51,25 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
 
   useEffect(() => {
     let active = true;
-    fetch("/api/withdrawals")
-      .then(async (res) => {
-        const data = (await res.json().catch(() => null)) as { withdrawals?: WithdrawalView[] } | null;
-        if (!active || !res.ok) return;
-        setPending((data?.withdrawals ?? []).filter((row) => row.status === "pending"));
-      })
-      .catch(() => {});
+
+    async function reloadPending() {
+      try {
+        const [cashRes, depositRes] = await Promise.all([fetch("/api/withdrawals"), fetch("/api/deposits")]);
+        const cashData = (await cashRes.json().catch(() => null)) as { withdrawals?: WithdrawalView[] } | null;
+        const depositData = (await depositRes.json().catch(() => null)) as { deposits?: DepositView[] } | null;
+        if (!active) return;
+        if (cashRes.ok) setPending((cashData?.withdrawals ?? []).filter((row) => row.status === "pending"));
+        if (depositRes.ok) setPendingDeposits((depositData?.deposits ?? []).filter((row) => row.status === "pending"));
+      } catch {
+        /* el próximo sync reintenta */
+      }
+    }
+
+    void reloadPending();
+    window.addEventListener(FAMILY_SYNC_EVENT, reloadPending);
     return () => {
       active = false;
+      window.removeEventListener(FAMILY_SYNC_EVENT, reloadPending);
     };
   }, []);
 
@@ -73,6 +89,12 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
     setError("");
     setFocus("gasto");
     setAction("transferir");
+  }
+
+  function openAportar() {
+    setError("");
+    setFocus("gasto");
+    setAction("aportar");
   }
 
   function close() {
@@ -140,6 +162,29 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
     }
   }
 
+  async function onAportar(walletType: WalletType, amountMinor: number, note: string) {
+    setBusyLock(true);
+    setError("");
+    try {
+      const res = await fetch("/api/deposits", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ walletType, amountMinor, note }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string; deposit?: DepositView } | null;
+      if (!res.ok || !data?.deposit) {
+        setError(data?.error ?? "No se pudo avisar el aporte.");
+        return;
+      }
+      setPendingDeposits((current) => [data.deposit!, ...current]);
+      setAction(null);
+      setFocus(null);
+      setToast(`Aporte de ${pesos(amountMinor)} avisado a tu Banquero.`);
+    } finally {
+      setBusyLock(false);
+    }
+  }
+
   async function cancelPedido(id: string) {
     setBusyLock(true);
     setError("");
@@ -158,22 +203,51 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
     }
   }
 
+  async function cancelAporte(id: string) {
+    setBusyLock(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/deposits/${id}/cancel`, { method: "POST" });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        setError(data?.error ?? "No se pudo cancelar.");
+        return;
+      }
+      setPendingDeposits((current) => current.filter((row) => row.id !== id));
+      setToast("Aporte cancelado.");
+    } finally {
+      setBusyLock(false);
+    }
+  }
+
   const byType = new Map(wallets.map((wallet) => [wallet.type, wallet]));
   const gasto = byType.get("gasto");
+  const hasPending = pending.length > 0 || pendingDeposits.length > 0;
 
   return (
     <section className="yo-rise-1 flex h-full flex-col rounded-[1.75rem] bg-card p-5 shadow-[0_12px_40px_rgba(109,76,255,0.12)]">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-2xl font-extrabold leading-tight">Mis Huchas</h2>
-        <button
-          type="button"
-          disabled={busyLock || (gasto?.availableMinor ?? 0) <= 0}
-          onClick={openTransferir}
-          className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-[#0055ff] px-3 py-2 text-sm font-bold text-white disabled:opacity-40"
-        >
-          Invertir
-          <ArrowUpRight className="size-4" aria-hidden />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            disabled={busyLock}
+            onClick={openAportar}
+            className="inline-flex items-center gap-1 rounded-xl bg-[#12a35a] px-3 py-2 text-sm font-bold text-white disabled:opacity-40"
+          >
+            <ArrowDownLeft className="size-4" aria-hidden />
+            Aportar
+          </button>
+          <button
+            type="button"
+            disabled={busyLock || (gasto?.availableMinor ?? 0) <= 0}
+            onClick={openTransferir}
+            className="inline-flex items-center gap-1 rounded-xl bg-[#0055ff] px-3 py-2 text-sm font-bold text-white disabled:opacity-40"
+          >
+            Invertir
+            <ArrowUpRight className="size-4" aria-hidden />
+          </button>
+        </div>
       </div>
       <div className="mt-3 grid flex-1 items-stretch gap-2.5 sm:grid-cols-3">
         {ORDER.map((type) => {
@@ -205,12 +279,25 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
         })}
       </div>
 
-      {pending.length > 0 ? (
+      {hasPending ? (
         <div className="mt-4 rounded-2xl border border-line bg-[#f8f5ff] p-4">
           <h3 className="text-sm font-extrabold">Pedidos a tu Banquero</h3>
           <ul className="mt-2 grid gap-2">
+            {pendingDeposits.map((row) => (
+              <li key={`deposit-${row.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="font-bold">
+                    Aporte {pesos(row.amountMinor)} · {WALLET_LABELS[row.walletType]}
+                  </p>
+                  {row.note ? <p className="truncate text-sm text-muted">{row.note}</p> : <p className="text-sm text-muted">Esperando que lo reciba</p>}
+                </div>
+                <button type="button" disabled={busyLock} onClick={() => cancelAporte(row.id)} className="shrink-0 text-sm font-bold text-red-800 disabled:opacity-50">
+                  Cancelar
+                </button>
+              </li>
+            ))}
             {pending.map((row) => (
-              <li key={row.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
+              <li key={`withdrawal-${row.id}`} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-white px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="font-bold">
                     {pesos(row.amountMinor)} · {WALLET_LABELS[row.walletType]}
@@ -266,7 +353,158 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
           confirmLabel="Transferir"
         />
       ) : null}
+
+      {action === "aportar" ? (
+        <AportarModal
+          busy={busyLock}
+          error={error}
+          onClearError={() => setError("")}
+          onClose={close}
+          onSubmit={onAportar}
+        />
+      ) : null}
     </section>
+  );
+}
+
+function AportarModal({
+  busy,
+  error,
+  onClearError,
+  onClose,
+  onSubmit,
+}: {
+  busy: boolean;
+  error: string;
+  onClearError: () => void;
+  onClose: () => void;
+  onSubmit: (walletType: WalletType, amount: number, note: string) => Promise<void>;
+}) {
+  const titleId = useId();
+  const [walletType, setWalletType] = useState<WalletType>("gasto");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [localError, setLocalError] = useState("");
+  const shownError = localError || error;
+
+  function clearErrors() {
+    setLocalError("");
+    onClearError();
+  }
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape" && !busy) onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [busy, onClose]);
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    clearErrors();
+    const parsed = parsePesosInput(amount);
+    if (!parsed.ok) {
+      setLocalError(parsed.error === "Escribe un monto." ? "Escribe cuánto quieres aportar." : parsed.error);
+      return;
+    }
+    await onSubmit(walletType, parsed.value, note.trim());
+  }
+
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
+      <form
+        noValidate
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        className="relative w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
+        onClick={(event) => event.stopPropagation()}
+        onSubmit={submit}
+      >
+        {busy ? <div className="absolute inset-0 z-10 grid place-items-center rounded-3xl bg-white/55" aria-busy="true"><Spinner /></div> : null}
+        <div className="flex items-start justify-between gap-3">
+          <h2 id={titleId} className="text-2xl font-extrabold leading-tight">
+            Aportar a una Hucha
+          </h2>
+          <button type="button" disabled={busy} onClick={onClose} className="text-sm font-bold text-muted disabled:opacity-50" aria-label="Cerrar">
+            ✕
+          </button>
+        </div>
+        <p className="mt-2 text-sm text-muted">
+          Si te regalaron plata, elige a qué Hucha va. Tu Banquero confirma cuando la reciba.
+        </p>
+
+        <fieldset className="mt-5">
+          <legend className="text-sm font-bold">¿A qué Hucha?</legend>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {APORTAR_WALLETS.map((type) => {
+              const on = walletType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    clearErrors();
+                    setWalletType(type);
+                  }}
+                  className={`rounded-2xl border-2 px-2 py-3 text-center text-xs font-extrabold disabled:opacity-50 ${
+                    on ? "border-accent bg-[#efe9ff] text-accent" : "border-line bg-white"
+                  }`}
+                >
+                  {WALLET_LABELS[type]}
+                </button>
+              );
+            })}
+          </div>
+        </fieldset>
+
+        <label className="mt-4 block text-sm font-bold">
+          Monto
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            value={amount}
+            onChange={(event) => {
+              clearErrors();
+              setAmount(formatPesosGrouped(event.target.value));
+            }}
+            placeholder="5.000"
+            aria-invalid={Boolean(shownError)}
+            className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 font-normal ${shownError ? "border-red-700" : "border-line"}`}
+          />
+        </label>
+        <label className="mt-3 block text-sm font-bold">
+          ¿De quién / de dónde? (opcional)
+          <input
+            value={note}
+            onChange={(event) => {
+              clearErrors();
+              setNote(event.target.value);
+            }}
+            placeholder="Salvador me regaló"
+            className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
+          />
+        </label>
+        {shownError ? (
+          <p role="alert" className="mt-3 text-sm text-red-700">
+            {shownError}
+          </p>
+        ) : null}
+        <div className="mt-6 grid grid-cols-2 gap-2">
+          <button type="submit" disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
+            Avisar a mi Banquero
+          </button>
+          <button type="button" disabled={busy} onClick={onClose} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </div>,
+    document.body,
   );
 }
 
@@ -296,7 +534,7 @@ function MoneyModal({
   confirmLabel: string;
 }) {
   const titleId = useId();
-  const [amount, setAmount] = useState(max > 0 ? String(max) : "");
+  const [amount, setAmount] = useState(max > 0 ? formatPesosGrouped(max) : "");
   const [note, setNote] = useState("");
   const [localError, setLocalError] = useState("");
   const shownError = localError || error;
@@ -333,8 +571,10 @@ function MoneyModal({
     await onSubmit(parsed.value, note.trim());
   }
 
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
       <form
         noValidate
         role="dialog"
@@ -358,12 +598,18 @@ function MoneyModal({
         <label className="mt-5 block text-sm font-bold">
           Monto
           <input
-            inputMode="decimal"
+            inputMode="numeric"
             autoComplete="off"
             value={amount}
             onChange={(event) => {
               clearErrors();
-              setAmount(event.target.value);
+              const next = formatPesosGrouped(event.target.value);
+              const parsed = parsePesosInput(next);
+              if (parsed.ok && parsed.value > max) {
+                setAmount(formatPesosGrouped(max));
+                return;
+              }
+              setAmount(next);
             }}
             aria-invalid={Boolean(shownError)}
             className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 font-normal ${shownError ? "border-red-700" : "border-line"}`}
@@ -396,7 +642,8 @@ function MoneyModal({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

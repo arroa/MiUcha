@@ -32,7 +32,8 @@ La crea el superusuario, junto con su banquero. El nombre lo pone el banquero; q
 | `pctInversion` | Porcentaje de Inversión. Con los otros dos suma 100 |
 | `pctGasto` | Porcentaje de Gasto |
 | `pctDonaciones` | Porcentaje de Donaciones |
-| `interestPercent` | Tasa mensual de la inversión. `10` es 10 %. Cero no abona |
+| `interestPercent` | Tasa mensual de rentabilidad. `10` es 10 %. Se aplica como tasa÷30 sobre el saldo diario de Inversión |
+| `syncVersion` | Contador que sube con cada cambio de plata, tips o retiros. Las pestañas abiertas lo consultan para refrescar |
 | `timezone` | `America/Santiago` |
 | `currency` | `CLP` |
 | `createdAt` | Alta |
@@ -151,7 +152,28 @@ Las claves estables son:
 
 Aprobar un Tip escribe tres asientos, uno por Hucha, con el mismo `operationId` y distinto `walletType`. El interés escribe uno, en `inversion`.
 
-Lo ahorrado en el mes, para esa tasa, es la suma de asientos de `inversion` de ese mes cuyos `kind` son `tip` o `transfer`, más los `withdrawal` negativos. Si el neto no es positivo, no hay asiento de interés.
+La rentabilidad del periodo se calcula sobre el cierre diario de Inversión (reconstruido desde el ledger). El banquero confirma el abono; queda registrado en `rentabilidad_pagos` para no repetir el mismo `YYYY-MM` por niño.
+
+## rentabilidad_pagos
+
+Marca de abono mensual (o parcial) por niño.
+
+| Campo | Significado |
+| --- | --- |
+| `familyId` | Familia |
+| `childId` | Niño |
+| `periodKey` | `YYYY-MM` |
+| `calculatedMinor` | Interés calculado (truncado) |
+| `discretionaryMinor` | Ajuste del banquero |
+| `paidMinor` | Monto abonado (`max(0, calculado + discrecional)`) |
+| `partial` | Si el mes en curso se cerró antes de terminar |
+| `interestPercent` | Tasa usada |
+| `daysIncluded` | Días contemplados |
+| `operationId` | Misma clave que el asiento ledger |
+| `paidBy` | Adulto banquero |
+| `paidAt` | Momento del abono |
+
+Índice único: `familyId` + `childId` + `periodKey`.
 
 ## withdrawal_requests
 

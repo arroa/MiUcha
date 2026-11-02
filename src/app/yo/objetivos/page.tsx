@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Star } from "lucide-react";
+import { Home, Pencil, Plus, Star } from "lucide-react";
 import { Suspense } from "react";
 
 import { ChildShell } from "@/components/child-shell";
 import { getChildSession } from "@/lib/child-account";
 import { goalIconDef } from "@/lib/goal-icons";
-import { listGoalsForChild } from "@/lib/goals";
+import { listGoalsForChild, type GoalView } from "@/lib/goals";
 
 function pesos(amount: number) {
   return `$${amount.toLocaleString("es-CL")}`;
@@ -28,12 +28,18 @@ async function Objetivos() {
     listGoalsForChild(child, "active"),
     listGoalsForChild(child, "achieved"),
   ]);
+  const favorite = active.find((goal) => goal.isFavorite) ?? null;
+  const others = active.filter((goal) => !goal.isFavorite);
 
   return (
     <ChildShell>
       <div className="flex items-center justify-between gap-3">
-        <Link href="/yo" className="text-sm font-bold text-accent">
-          ← Inicio
+        <Link
+          href="/yo"
+          className="inline-flex items-center gap-1.5 rounded-2xl border border-line bg-card px-3 py-2 text-sm font-bold shadow-sm"
+        >
+          <Home className="size-4 text-accent" aria-hidden />
+          Inicio
         </Link>
         <Link
           href="/yo/objetivos/nuevo"
@@ -62,32 +68,16 @@ async function Objetivos() {
             </div>
           ) : (
             <ul className="mt-3 space-y-3">
-              {active.map((goal) => {
-                const Icon = goalIconDef(goal.iconId).Icon;
-                return (
-                  <li key={goal.id}>
-                    <Link href={`/yo/objetivos/${goal.id}`} className="block rounded-3xl border border-line bg-card p-4 shadow-sm">
-                      <div className="flex items-start gap-3">
-                        <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#efe9ff] text-accent">
-                          <Icon className="size-6" aria-hidden />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="truncate text-lg font-extrabold">{goal.name}</p>
-                            {goal.isFavorite ? <Star className="size-4 shrink-0 fill-accent text-accent" aria-label="Favorito" /> : null}
-                          </div>
-                          <p className="text-sm text-muted">
-                            {goal.progressPercent}% · falta {pesos(goal.missingMinor)}
-                          </p>
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ebe4ff]">
-                            <div className="h-full rounded-full bg-accent" style={{ width: `${goal.progressPercent}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
+              {favorite ? (
+                <li>
+                  <GoalCatalogCard goal={favorite} principal />
+                </li>
+              ) : null}
+              {others.map((goal) => (
+                <li key={goal.id}>
+                  <GoalCatalogCard goal={goal} />
+                </li>
+              ))}
             </ul>
           )}
         </section>
@@ -120,5 +110,53 @@ async function Objetivos() {
         </section>
       </div>
     </ChildShell>
+  );
+}
+
+function GoalCatalogCard({ goal, principal = false }: { goal: GoalView; principal?: boolean }) {
+  const Icon = goalIconDef(goal.iconId).Icon;
+  return (
+    <article
+      className={`rounded-3xl border p-4 shadow-sm ${
+        principal ? "border-accent/40 bg-gradient-to-br from-[#efe9ff] to-card" : "border-line bg-card"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <Link
+          href={`/yo/objetivos/${goal.id}`}
+          className="grid size-12 shrink-0 place-items-center rounded-2xl bg-[#efe9ff] text-accent"
+          aria-label={`Ver ${goal.name}`}
+        >
+          <Icon className="size-6" aria-hidden />
+        </Link>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <Link href={`/yo/objetivos/${goal.id}`} className="min-w-0 truncate text-lg font-extrabold hover:text-accent">
+              {goal.name}
+            </Link>
+            {goal.isFavorite ? <Star className="size-4 shrink-0 fill-accent text-accent" aria-label="Favorito" /> : null}
+          </div>
+          {principal ? <p className="text-xs font-bold uppercase tracking-wide text-accent">Principal</p> : null}
+          <p className="text-sm text-muted">
+            {goal.progressPercent}% · falta {pesos(goal.missingMinor)}
+          </p>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#ebe4ff]">
+            <div className="h-full rounded-full bg-accent" style={{ width: `${goal.progressPercent}%` }} />
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={`/yo/objetivos/${goal.id}/editar`}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-line bg-white px-3 py-1.5 text-sm font-bold"
+            >
+              <Pencil className="size-3.5" aria-hidden />
+              Editar
+            </Link>
+            <Link href={`/yo/objetivos/${goal.id}`} className="inline-flex items-center rounded-xl px-3 py-1.5 text-sm font-bold text-accent">
+              Ver →
+            </Link>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }

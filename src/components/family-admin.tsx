@@ -2,10 +2,10 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 
+import { FamilyRentabilidad } from "@/components/family-rentabilidad";
 import { FamilyTips } from "@/components/family-tips";
 import { PinField } from "@/components/pin-help";
 import { TaskReview } from "@/components/task-review";
-import { parsePesosInput } from "@/lib/pesos-input";
 import { isPin } from "@/lib/pin-rules";
 import type { TipView } from "@/lib/tips";
 
@@ -24,6 +24,7 @@ type FamilyDetail = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
+  interestPercent: number;
 };
 
 export function FamilyAdmin({
@@ -448,12 +449,13 @@ function NewFamilyCard({ selfEmail, onCreated }: { selfEmail: string; onCreated:
   );
 }
 
-type SectionId = "auditar" | "datos" | "ninos" | "auditores" | "tips";
+type SectionId = "auditar" | "datos" | "ninos" | "rentabilidad" | "auditores" | "tips";
 
 const SECTIONS: { id: SectionId; short: string }[] = [
   { id: "auditar", short: "Movimientos" },
   { id: "datos", short: "Datos" },
   { id: "ninos", short: "Niños" },
+  { id: "rentabilidad", short: "Rentabilidad" },
   { id: "auditores", short: "Auditores" },
   { id: "tips", short: "Tips" },
 ];
@@ -479,6 +481,7 @@ function BanqueroPanel({
   const [auditorRows, setAuditorRows] = useState(auditors);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [rentabilidadChildId, setRentabilidadChildId] = useState<string | null>(null);
 
   async function saveParams(event: FormEvent) {
     event.preventDefault();
@@ -492,11 +495,12 @@ function BanqueroPanel({
         pctInversion: Number(params.pctInversion),
         pctGasto: Number(params.pctGasto),
         pctDonaciones: Number(params.pctDonaciones),
+        interestPercent: Number(params.interestPercent),
       }),
     });
     const data = (await res.json().catch(() => null)) as { error?: string } | null;
     if (!res.ok) {
-      setError(data?.error ?? "No se pudieron guardar los porcentajes.");
+      setError(data?.error ?? "No se pudieron guardar los parámetros.");
       return;
     }
     setMessage("Parámetros guardados.");
@@ -505,14 +509,14 @@ function BanqueroPanel({
 
   return (
     <div className="grid gap-4">
-      <div className={`grid grid-cols-2 gap-2 ${auditor ? "sm:grid-cols-3" : "sm:grid-cols-5"}`}>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {(auditor ? SECTIONS.filter((section) => section.id === "auditar" || section.id === "datos" || section.id === "ninos") : SECTIONS).map((section) => (
           <button
             key={section.id}
             type="button"
             aria-pressed={open === section.id}
             onClick={() => setOpen(section.id)}
-            className={`rounded-2xl border px-3 py-3 text-left font-serif text-lg ${open === section.id ? "border-accent bg-accent/10" : "border-line bg-white"}`}
+            className={`min-w-0 rounded-2xl border px-3 py-2.5 text-center font-serif text-base leading-tight sm:text-lg ${open === section.id ? "border-accent bg-accent/10" : "border-line bg-white"}`}
           >
             {section.short}
           </button>
@@ -522,7 +526,29 @@ function BanqueroPanel({
       {open === "datos" ? (
         <DatosPanel mode="open" readOnly={auditor} params={params} setParams={setParams} onSubmit={saveParams} error={error} message={message} />
       ) : null}
-      {open === "ninos" ? <Children mode="open" readOnly={auditor} rows={childRows} setRows={setChildRows} /> : null}
+      {open === "ninos" ? (
+        <Children
+          mode="open"
+          readOnly={auditor}
+          rows={childRows}
+          setRows={setChildRows}
+          onOpenRentabilidad={
+            auditor
+              ? undefined
+              : (childId) => {
+                  setRentabilidadChildId(childId);
+                  setOpen("rentabilidad");
+                }
+          }
+        />
+      ) : null}
+      {!auditor ? (
+        <FamilyRentabilidad
+          visible={open === "rentabilidad"}
+          initialChildId={rentabilidadChildId}
+          onOpenSection={() => setOpen("rentabilidad")}
+        />
+      ) : null}
       {open === "auditores" ? <Auditors mode="open" rows={auditorRows} setRows={setAuditorRows} /> : null}
       {open === "tips" ? <FamilyTips mode="open" initialTips={tips} /> : null}
     </div>
@@ -619,6 +645,7 @@ function DatosPanel({
         <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
         <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
         <MiniStat label="Generosidad" value={`${params.pctDonaciones}%`} />
+        <MiniStat label="Tasa rent." value={`${params.interestPercent}%`} />
       </PreviewCard>
     );
   }
@@ -631,6 +658,7 @@ function DatosPanel({
           <MiniStat label="Inversión" value={`${params.pctInversion}%`} />
           <MiniStat label="Gasto" value={`${params.pctGasto}%`} />
           <MiniStat label="Generosidad" value={`${params.pctDonaciones}%`} />
+          <MiniStat label="Tasa rentabilidad" value={`${params.interestPercent}% mensual`} />
         </div>
       </OpenCard>
     );
@@ -646,6 +674,15 @@ function DatosPanel({
         <Input label="Inversión %" type="number" value={String(params.pctInversion)} onChange={(value) => setParams({ ...params, pctInversion: Number(value) })} />
         <Input label="Gasto %" type="number" value={String(params.pctGasto)} onChange={(value) => setParams({ ...params, pctGasto: Number(value) })} />
         <Input label="Generosidad %" type="number" value={String(params.pctDonaciones)} onChange={(value) => setParams({ ...params, pctDonaciones: Number(value) })} />
+        <div className="sm:col-span-2">
+          <Input
+            label="Tasa rentabilidad mensual %"
+            type="number"
+            value={String(params.interestPercent)}
+            onChange={(value) => setParams({ ...params, interestPercent: Number(value) })}
+          />
+          <p className="mt-2 text-sm text-muted">Se aplica como tasa ÷ 30 sobre el saldo diario de Inversión.</p>
+        </div>
         {error ? <p className="text-sm text-red-700 sm:col-span-2">{error}</p> : null}
         {message ? <p className="text-sm text-accent sm:col-span-2">{message}</p> : null}
         <button className="rounded-2xl bg-accent px-4 py-3 font-bold text-white sm:col-span-2">Guardar parámetros</button>
@@ -779,12 +816,14 @@ function Children({
   mode,
   readOnly = false,
   onToggle,
+  onOpenRentabilidad,
 }: {
   rows: ChildItem[];
   setRows: (update: (rows: ChildItem[]) => ChildItem[]) => void;
   mode: "preview" | "open";
   readOnly?: boolean;
   onToggle?: () => void;
+  onOpenRentabilidad?: (childId: string) => void;
 }) {
   const [toast, setToast] = useToast();
   const [selected, setSelected] = useState<string | null>(null);
@@ -817,6 +856,7 @@ function Children({
                 child={child}
                 readOnly={readOnly}
                 onCollapse={() => setSelected(null)}
+                onOpenRentabilidad={onOpenRentabilidad}
                 onSaved={(next) => {
                   setRows((current) => current.map((row) => (row.id === next.id ? next : row)));
                   setToast(`Datos de ${next.name} guardados.`);
@@ -880,18 +920,15 @@ function pesos(amount: number) {
   return `$${amount.toLocaleString("es-CL")}`;
 }
 
-function ChildCartola({ childId, childName, canCredit }: { childId: string; childName: string; canCredit: boolean }) {
+function ChildCartola({
+  childId,
+  onOpenRentabilidad,
+}: {
+  childId: string;
+  onOpenRentabilidad?: (childId: string) => void;
+}) {
   const [cartola, setCartola] = useState<ChildCartolaView | null>(null);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
-  const [crediting, setCrediting] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(""), 2000);
-    return () => window.clearTimeout(timer);
-  }, [toast]);
 
   useEffect(() => {
     let active = true;
@@ -913,7 +950,7 @@ function ChildCartola({ childId, childName, canCredit }: { childId: string; chil
     return () => {
       active = false;
     };
-  }, [childId, reloadKey]);
+  }, [childId]);
 
   if (error) return <p className="mt-4 text-sm text-red-700">{error}</p>;
   if (!cartola) {
@@ -971,132 +1008,15 @@ function ChildCartola({ childId, childName, canCredit }: { childId: string; chil
           </li>
         ))}
       </ul>
-      {canCredit ? (
-        <button type="button" onClick={() => setCrediting(true)} className="rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm font-bold text-accent">
-          Abonar intereses
+      {onOpenRentabilidad ? (
+        <button
+          type="button"
+          onClick={() => onOpenRentabilidad(childId)}
+          className="rounded-2xl border border-accent/40 bg-accent/5 px-4 py-3 text-sm font-bold text-accent"
+        >
+          Ver rentabilidad
         </button>
       ) : null}
-      {crediting ? (
-        <InteresesModal
-          childId={childId}
-          childName={childName}
-          onClose={() => setCrediting(false)}
-          onDone={(amount) => {
-            setCrediting(false);
-            setReloadKey((key) => key + 1);
-            setToast(`Intereses de ${pesos(amount)} abonados a Inversión.`);
-          }}
-        />
-      ) : null}
-      {toast ? (
-        <p role="status" className="mihucha-toast fixed top-20 right-6 z-50 max-w-xs rounded-2xl border border-white/15 bg-foreground/60 px-4 py-3 text-sm font-bold text-background shadow-lg backdrop-blur-md">
-          {toast}
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function InteresesModal({
-  childId,
-  childName,
-  onClose,
-  onDone,
-}: {
-  childId: string;
-  childName: string;
-  onClose: () => void;
-  onDone: (amount: number) => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape" && !busy) onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setError("");
-    const parsed = parsePesosInput(amount);
-    if (!parsed.ok) {
-      setError(parsed.error);
-      return;
-    }
-    setBusy(true);
-    try {
-      const res = await fetch("/api/rentabilidad", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ childId, amountMinor: parsed.value }),
-      });
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
-      if (!res.ok) {
-        setError(data?.error ?? "No se pudo abonar los intereses.");
-        return;
-      }
-      onDone(parsed.value);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-foreground/40 px-6" role="presentation" onClick={() => { if (!busy) onClose(); }}>
-      <form
-        noValidate
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="abonar-intereses"
-        className="relative w-full max-w-sm rounded-3xl bg-card p-6 shadow-lg"
-        onClick={(event) => event.stopPropagation()}
-        onSubmit={submit}
-      >
-        {busy ? <div className="absolute inset-0 z-10 rounded-3xl bg-white/55" aria-busy="true" /> : null}
-        <div className="flex items-start justify-between gap-3">
-          <h2 id="abonar-intereses" className="font-serif text-3xl">
-            Abonar intereses
-          </h2>
-          <button type="button" disabled={busy} onClick={onClose} className="text-sm font-bold text-muted disabled:opacity-50" aria-label="Cerrar">
-            ✕
-          </button>
-        </div>
-        <p className="mt-2 text-sm text-muted">
-          Se suma a la Inversión de {childName}. Es tu decisión como banquero.
-        </p>
-        <label className="mt-5 block text-sm">
-          Monto
-          <input
-            inputMode="decimal"
-            autoComplete="off"
-            value={amount}
-            onChange={(event) => {
-              setError("");
-              setAmount(event.target.value);
-            }}
-            aria-invalid={Boolean(error)}
-            className={`mt-1.5 w-full rounded-2xl border bg-white px-4 py-3 ${error ? "border-red-700" : "border-line"}`}
-          />
-        </label>
-        {error ? (
-          <p role="alert" className="mt-3 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
-        <div className="mt-6 grid grid-cols-2 gap-2">
-          <button type="submit" disabled={busy} className="rounded-2xl bg-accent px-4 py-3 font-bold text-white disabled:opacity-50">
-            {busy ? "Abonando…" : "Continuar"}
-          </button>
-          <button type="button" disabled={busy} onClick={onClose} className="rounded-2xl border border-foreground/20 px-4 py-3 font-bold disabled:opacity-50">
-            Cancelar
-          </button>
-        </div>
-      </form>
     </div>
   );
 }
@@ -1107,12 +1027,14 @@ function ChildCard({
   onSaved,
   onRemoved,
   onCollapse,
+  onOpenRentabilidad,
 }: {
   child: ChildItem;
   readOnly?: boolean;
   onSaved: (child: ChildItem) => void;
   onRemoved: (name: string) => void;
   onCollapse: () => void;
+  onOpenRentabilidad?: (childId: string) => void;
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "baja">("view");
   const [name, setName] = useState(child.name);
@@ -1204,7 +1126,9 @@ function ChildCard({
             En casa, <span className="font-bold">{child.loginId}</span>
           </p>
           {born ? <p className="mt-1 text-sm text-muted">{born}</p> : null}
-          {mode === "view" ? <ChildCartola childId={child.id} childName={child.name} canCredit={!readOnly} /> : null}
+          {mode === "view" ? (
+            <ChildCartola childId={child.id} onOpenRentabilidad={readOnly ? undefined : onOpenRentabilidad} />
+          ) : null}
         </>
       )}
       {mode === "baja" ? <p className="mt-3 text-sm">{child.name} deja de poder entrar. Su libro se queda.</p> : null}

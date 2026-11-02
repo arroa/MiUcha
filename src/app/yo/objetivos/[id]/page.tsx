@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Target } from "lucide-react";
 import { Suspense } from "react";
 
 import { ChildShell } from "@/components/child-shell";
@@ -42,8 +42,12 @@ async function ObjetivoDetalle({ params }: Params) {
 
   return (
     <ChildShell>
-      <Link href="/yo/objetivos" className="text-sm font-bold text-accent">
-        ← Mis objetivos
+      <Link
+        href="/yo/objetivos"
+        className="inline-flex items-center gap-1.5 rounded-2xl border border-line bg-card px-3 py-2 text-sm font-bold shadow-sm"
+      >
+        <Target className="size-4 text-accent" aria-hidden />
+        Mis objetivos
       </Link>
 
       <div className="mt-5 grid gap-6 lg:grid-cols-2 lg:items-start">

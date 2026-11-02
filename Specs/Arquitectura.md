@@ -73,16 +73,13 @@ Cada operación lleva un `operationId` fijo. Un reintento, un doble clic o un cr
 
 El reparto usa los porcentajes de ese momento. Lo ya abonado no se recalcula. El residuo de pesos, si el reparto no cae entero, va a Gasto.
 
-El interés corre el último día del mes. Es la tasa de la familia aplicada a lo ahorrado en Inversión durante ese mes. Lo ahorrado es lo que entró menos lo que salió. Si no quedó ahorro, el interés es cero. Se trunca al peso.
+La rentabilidad la abona el banquero (cualquier día). Es interés simple: suma del saldo diario de Inversión × (tasa mensual ÷ 30), más un ajuste discrecional. Se puede cerrar el mes en curso con los días ya pasados; cada niño/mes se paga una sola vez. Los días 1–5 recuerdan el mes anterior impago.
 
 ## Cron
 
 `/api/cron/daily` no es público. Lo llama Vercel con un secreto.
 
-Hace dos trabajos, en hora de Santiago:
-
-- Crea las ocurrencias de Tips diarios y semanales que correspondan.
-- El último día del mes, abona el interés de cada niño, una vez.
+Crea las ocurrencias de Tips diarios y semanales que correspondan (hora Santiago). No abona intereses.
 
 No aprueba Tips ni entrega plata. Eso lo hace una persona.
 
@@ -96,6 +93,6 @@ Se puede instalar. Sin red, las pantallas ya abiertas pueden verse con lo últim
 | --- | --- |
 | Clerk | Identidad de superusuario, banquero y auditor |
 | MongoDB Atlas | Todos los datos de MiHucha |
-| Vercel Cron | Ocurrencias de Tips e interés mensual |
+| Vercel Cron | Ocurrencias de Tips |
 
 No hay pasarela de pago ni banco. La plata física la entrega el banquero.

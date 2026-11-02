@@ -19,6 +19,7 @@ import {
   ShoppingBag,
   Smartphone,
   Sparkles,
+  Speaker,
   Star,
   Ticket,
   Watch,
@@ -27,13 +28,10 @@ import {
 export type GoalIconCategory =
   | "tecnologia"
   | "videojuegos"
-  | "musica"
   | "deportes"
   | "ropa"
   | "hobbies"
-  | "regalos"
-  | "experiencias"
-  | "otros";
+  | "regalos";
 
 export type GoalIconDef = {
   id: string;
@@ -45,13 +43,10 @@ export type GoalIconDef = {
 export const GOAL_ICON_CATEGORIES: { id: GoalIconCategory; label: string }[] = [
   { id: "tecnologia", label: "Tecnología" },
   { id: "videojuegos", label: "Videojuegos" },
-  { id: "musica", label: "Música" },
   { id: "deportes", label: "Deportes" },
   { id: "ropa", label: "Ropa" },
   { id: "hobbies", label: "Hobbies" },
   { id: "regalos", label: "Regalos" },
-  { id: "experiencias", label: "Experiencias" },
-  { id: "otros", label: "Otros" },
 ];
 
 export const GOAL_ICONS: GoalIconDef[] = [
@@ -61,22 +56,23 @@ export const GOAL_ICONS: GoalIconDef[] = [
   { id: "phone", category: "tecnologia", label: "Celular", Icon: Smartphone },
   { id: "monitor", category: "tecnologia", label: "Pantalla", Icon: Monitor },
   { id: "camera", category: "tecnologia", label: "Cámara", Icon: Camera },
+  { id: "headphones", category: "tecnologia", label: "Audífonos", Icon: Headphones },
+  { id: "speakers", category: "tecnologia", label: "Parlantes", Icon: Speaker },
+  { id: "music", category: "tecnologia", label: "Música", Icon: Music },
   { id: "gamepad", category: "videojuegos", label: "Consola", Icon: Gamepad2 },
   { id: "clapper", category: "videojuegos", label: "Juego", Icon: Clapperboard },
-  { id: "headphones", category: "musica", label: "Audífonos", Icon: Headphones },
-  { id: "music", category: "musica", label: "Música", Icon: Music },
   { id: "bike", category: "deportes", label: "Bici", Icon: Bike },
   { id: "shirt", category: "ropa", label: "Ropa", Icon: Shirt },
   { id: "watch", category: "ropa", label: "Reloj", Icon: Watch },
   { id: "palette", category: "hobbies", label: "Arte", Icon: Palette },
   { id: "book", category: "hobbies", label: "Libros", Icon: BookOpen },
+  { id: "plane", category: "hobbies", label: "Viaje", Icon: Plane },
+  { id: "ticket", category: "hobbies", label: "Entrada", Icon: Ticket },
   { id: "gift", category: "regalos", label: "Regalo", Icon: Gift },
   { id: "heart", category: "regalos", label: "Especial", Icon: Heart },
-  { id: "plane", category: "experiencias", label: "Viaje", Icon: Plane },
-  { id: "ticket", category: "experiencias", label: "Entrada", Icon: Ticket },
-  { id: "bag", category: "otros", label: "Compra", Icon: ShoppingBag },
-  { id: "star", category: "otros", label: "Meta", Icon: Star },
-  { id: "sparkles", category: "otros", label: "Sueño", Icon: Sparkles },
+  { id: "bag", category: "regalos", label: "Compra", Icon: ShoppingBag },
+  { id: "star", category: "regalos", label: "Meta", Icon: Star },
+  { id: "sparkles", category: "regalos", label: "Sueño", Icon: Sparkles },
 ];
 
 export const DEFAULT_GOAL_ICON_ID = "sparkles";

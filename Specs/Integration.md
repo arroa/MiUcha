@@ -40,7 +40,7 @@ El nombre de la base es `MONGODB_DB_NAME`. Atlas tiene que aceptar transacciones
 
 | | |
 | --- | --- |
-| Para qué | Una vez al día: ocurrencias de Tips, y el interés el último día del mes |
+| Para qué | Una vez al día: ocurrencias de Tips |
 | Ruta | `GET /api/cron/daily` |
 | Autenticación | Cabecera `Authorization: Bearer <CRON_SECRET>` |
 | Dónde vive el secreto | `CRON_SECRET` en Vercel. La ruta responde 401 sin ese valor |
@@ -57,6 +57,7 @@ El cron no aprueba tareas ni entrega plata.
 | Entrar, niño | `POST /api/child-auth/login` | Niño | Nombre de la familia y PIN | Cookie de sesión |
 | Salir, niño | `POST /api/child-auth/logout` | Niño | La cookie | Sesión revocada |
 | Quién soy | `GET /api/me` | Cualquier sesión | — | Persona, familia y rol |
+| Sync en vivo | `GET /api/sync` | Niño o adulto con familia | — | `{ version }` de la familia. El cliente lo consulta cada pocos segundos y, si cambió, hace `refresh` |
 
 El adulto en producción entra por Clerk, no por `dev-login`.
 
@@ -100,6 +101,8 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | Cancelar pedido | `POST /api/withdrawals/:id/cancel` | Niño o banquero | — | `cancelled`. El saldo no se tocó |
 | Movimientos | `GET /api/movements` | Niño los suyos. Adultos, los de la familia | Filtro por niño y mes | Libro |
 | Mi mes | `GET /api/monthly-summary` | Niño, o adulto de esa familia | Mes | Ganado, reparto, interés, retiros, transferencias |
+| Preview rentabilidad | `GET /api/rentabilidad` | Banquero | `period=YYYY-MM` opcional | Saldos diarios, cálculo, nag 1–5, periodos elegibles |
+| Abonar rentabilidad | `POST /api/rentabilidad` | Banquero | `childId`, `periodKey`, `discretionaryMinor` | Asiento en Inversión y marca pagado del mes |
 
 ### Novedades y cron
 
@@ -107,4 +110,4 @@ El adulto en producción entra por Clerk, no por `dev-login`.
 | --- | --- | --- | --- | --- |
 | Portada | `GET /api/news` | La sesión | — | Por hacer, y lo que pasó |
 | Marcar vista | `POST /api/news/:id/read` | El destinatario | — | Queda vista. Si era una tarea, sigue pendiente |
-| Día | `GET /api/cron/daily` | Vercel, con `CRON_SECRET` | — | Ocurrencias creadas y, si es el último día, intereses abonados |
+| Día | `GET /api/cron/daily` | Vercel, con `CRON_SECRET` | — | Ocurrencias de Tips creadas |

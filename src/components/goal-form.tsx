@@ -6,7 +6,7 @@ import { useId, useState, type FormEvent } from "react";
 import { GoalIconPicker } from "@/components/goal-icon-picker";
 import { DEFAULT_GOAL_ICON_ID, goalIconDef } from "@/lib/goal-icons";
 import type { GoalView } from "@/lib/goals";
-import { parsePesosInput } from "@/lib/pesos-input";
+import { formatPesosGrouped, parsePesosInput } from "@/lib/pesos-input";
 import { UI_TOAST_DURATION_MS } from "@/lib/ui";
 
 function pesos(amount: number) {
@@ -23,7 +23,7 @@ export function GoalForm({
   const router = useRouter();
   const titleId = useId();
   const [name, setName] = useState(initial?.name ?? "");
-  const [price, setPrice] = useState(initial ? String(initial.targetAmountMinor) : "");
+  const [price, setPrice] = useState(initial ? formatPesosGrouped(initial.targetAmountMinor) : "");
   const [description, setDescription] = useState(initial?.description ?? "");
   const [productUrl, setProductUrl] = useState(initial?.productUrl ?? "");
   const [iconId, setIconId] = useState(initial?.iconId ?? DEFAULT_GOAL_ICON_ID);
@@ -33,6 +33,7 @@ export function GoalForm({
 
   const Icon = goalIconDef(iconId).Icon;
   const parsedPreview = parsePesosInput(price);
+  const saveLabel = busy ? "Guardando…" : mode === "create" ? "Guardar objetivo" : "Guardar cambios";
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -68,7 +69,7 @@ export function GoalForm({
       }
       setToast(mode === "create" ? "Objetivo guardado." : "Cambios guardados.");
       window.setTimeout(() => {
-        router.push(`/yo/objetivos/${data.goal!.id}`);
+        router.push("/yo/objetivos");
         router.refresh();
       }, 400);
     } finally {
@@ -79,9 +80,19 @@ export function GoalForm({
   return (
     <form noValidate onSubmit={onSubmit} className="relative space-y-5" aria-labelledby={titleId}>
       {busy ? <div className="absolute inset-0 z-10 rounded-3xl bg-white/50" aria-busy="true" /> : null}
-      <h1 id={titleId} className="text-2xl font-extrabold">
-        {mode === "create" ? "Nuevo objetivo" : "Editar objetivo"}
-      </h1>
+
+      <div className="sticky top-0 z-20 -mx-1 flex items-center justify-between gap-3 border-b border-line/70 bg-background/95 px-1 py-3 backdrop-blur">
+        <h1 id={titleId} className="min-w-0 truncate text-2xl font-extrabold">
+          {mode === "create" ? "Nuevo objetivo" : "Editar objetivo"}
+        </h1>
+        <button
+          type="submit"
+          disabled={busy}
+          className="shrink-0 rounded-2xl bg-accent px-4 py-2.5 text-sm font-extrabold text-white shadow-[0_8px_24px_rgba(109,76,255,0.28)] disabled:opacity-50"
+        >
+          {saveLabel}
+        </button>
+      </div>
 
       <div className="rounded-3xl bg-card p-4 shadow-sm">
         <p className="text-xs font-bold uppercase tracking-wider text-muted">Vista previa</p>
@@ -96,29 +107,32 @@ export function GoalForm({
         </div>
       </div>
 
-      <label className="block text-sm font-bold">
-        ¿Qué quieres conseguir?
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          maxLength={80}
-          disabled={busy}
-          className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
-          placeholder="Ej: Mouse gamer"
-        />
-      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="block text-sm font-bold">
+          ¿Qué quieres conseguir?
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={80}
+            disabled={busy}
+            className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
+            placeholder="Ej: Mouse gamer"
+          />
+        </label>
 
-      <label className="block text-sm font-bold">
-        ¿Cuánto cuesta?
-        <input
-          inputMode="numeric"
-          value={price}
-          onChange={(e) => setPrice(e.target.value)}
-          disabled={busy}
-          className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
-          placeholder="35000"
-        />
-      </label>
+        <label className="block text-sm font-bold">
+          ¿Cuánto cuesta?
+          <input
+            inputMode="numeric"
+            autoComplete="off"
+            value={price}
+            onChange={(e) => setPrice(formatPesosGrouped(e.target.value))}
+            disabled={busy}
+            className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal tabular-nums"
+            placeholder="35.000"
+          />
+        </label>
+      </div>
 
       <label className="block text-sm font-bold">
         Cuéntanos un poquito más <span className="font-normal text-muted">(opcional)</span>
@@ -136,12 +150,14 @@ export function GoalForm({
       <label className="block text-sm font-bold">
         ¿Dónde lo viste? <span className="font-normal text-muted">(opcional)</span>
         <input
-          type="url"
+          type="text"
+          inputMode="url"
+          autoComplete="url"
           value={productUrl}
           onChange={(e) => setProductUrl(e.target.value)}
           disabled={busy}
           className="mt-1.5 w-full rounded-2xl border border-line bg-white px-4 py-3 font-normal"
-          placeholder="https://www.tienda.cl/..."
+          placeholder="www.tienda.cl o pega el enlace"
         />
       </label>
 
@@ -152,14 +168,6 @@ export function GoalForm({
           {error}
         </p>
       ) : null}
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-2xl bg-accent py-3.5 font-extrabold text-white shadow-[0_8px_24px_rgba(109,76,255,0.28)] disabled:opacity-50"
-      >
-        {busy ? "Guardando…" : mode === "create" ? "Guardar objetivo" : "Guardar cambios"}
-      </button>
 
       {toast ? (
         <p

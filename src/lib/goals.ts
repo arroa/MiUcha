@@ -3,7 +3,7 @@ import { ObjectId } from "mongodb";
 import { getChildSession } from "@/lib/child-account";
 import { childGoals, type Child, type ChildGoal, type GoalStatus } from "@/lib/collections";
 import { DEFAULT_GOAL_ICON_ID, isGoalIconId } from "@/lib/goal-icons";
-import { sanitizeProductUrl } from "@/lib/goal-url";
+import { resolveProductUrl } from "@/lib/goal-url";
 import { walletsSnapshot, type WalletView } from "@/lib/money";
 
 const NAME_MAX = 80;
@@ -152,6 +152,7 @@ export async function createGoalForChild(child: Child, raw: unknown) {
   const now = new Date();
   const col = await childGoals();
   const activeCount = await col.countDocuments({ childId: child._id, familyId: child.familyId, status: "active" });
+  const productUrl = await resolveProductUrl(json.productUrl);
   const doc: ChildGoal = {
     _id: new ObjectId(),
     familyId: child.familyId,
@@ -160,7 +161,7 @@ export async function createGoalForChild(child: Child, raw: unknown) {
     description: parseDescription(json.description),
     targetAmountMinor: parsePrice(json.targetAmountMinor),
     iconId: parseIconId(json.iconId),
-    productUrl: sanitizeProductUrl(json.productUrl),
+    productUrl,
     status: "active",
     isFavorite: activeCount === 0,
     createdAt: now,
@@ -181,7 +182,7 @@ export async function updateGoalForChild(child: Child, goalId: string, raw: unkn
   if ("description" in json) patch.description = parseDescription(json.description);
   if ("targetAmountMinor" in json) patch.targetAmountMinor = parsePrice(json.targetAmountMinor);
   if ("iconId" in json) patch.iconId = parseIconId(json.iconId);
-  if ("productUrl" in json) patch.productUrl = sanitizeProductUrl(json.productUrl);
+  if ("productUrl" in json) patch.productUrl = await resolveProductUrl(json.productUrl);
 
   await (await childGoals()).updateOne({ _id: goal._id, childId: child._id }, { $set: patch });
   return getGoalForChild(child, goalId);

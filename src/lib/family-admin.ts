@@ -1,7 +1,7 @@
 import { ObjectId } from "mongodb";
 
 import { getAdultSession, getSuperAdminEmail, type AdultSession } from "@/lib/adult-session";
-import { adults, children, families, ledgerEntries, tipDefinitions, tipOccurrences, wallets, withdrawalRequests, type AdultRole, type WalletType } from "@/lib/collections";
+import { adults, children, depositRequests, families, ledgerEntries, rentabilidadPagos, tipDefinitions, tipOccurrences, wallets, withdrawalRequests, type AdultRole, type WalletType } from "@/lib/collections";
 import { deleteClerkUser, ensureClerkUser, normalizeEmail } from "@/lib/clerk-users";
 import { familyNameKey } from "@/lib/family-name";
 import { hashPin, pinProblem, verifyPin } from "@/lib/pin";
@@ -79,6 +79,8 @@ export async function createFamily(input: { banqueroName: string; banqueroEmail:
     pctInversion: 50,
     pctGasto: 40,
     pctDonaciones: 10,
+    interestPercent: 10,
+    syncVersion: 0,
     timezone: "America/Santiago",
     currency: "CLP",
     createdAt: now,
@@ -137,7 +139,9 @@ export async function deleteFamily(familyId: string) {
   await (await tipDefinitions()).deleteMany({ familyId: id });
   await (await tipOccurrences()).deleteMany({ familyId: id });
   await (await withdrawalRequests()).deleteMany({ familyId: id });
+  await (await depositRequests()).deleteMany({ familyId: id });
   await (await ledgerEntries()).deleteMany({ familyId: id });
+  await (await rentabilidadPagos()).deleteMany({ familyId: id });
   await (await adults()).deleteMany({ familyId: id });
   await (await families()).deleteOne({ _id: id });
 
@@ -160,6 +164,7 @@ export async function updateFamilyParameters(input: {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
+  interestPercent: number;
 }) {
   const name = input.name.trim();
   if (!name) throw new Error("Ponle un nombre a la familia.");
@@ -167,10 +172,14 @@ export async function updateFamilyParameters(input: {
   if (!percentagesAreValid(input.pctInversion, input.pctGasto, input.pctDonaciones)) {
     throw new Error("Los porcentajes de Inversión, Gasto y Generosidad tienen que sumar 100.");
   }
+  if (!Number.isInteger(input.interestPercent) || input.interestPercent < 0 || input.interestPercent > 100) {
+    throw new Error("La tasa de rentabilidad mensual va de 0 a 100.");
+  }
   await saveFamilyName(new ObjectId(input.familyId), name, {
     pctInversion: input.pctInversion,
     pctGasto: input.pctGasto,
     pctDonaciones: input.pctDonaciones,
+    interestPercent: input.interestPercent,
   });
 }
 

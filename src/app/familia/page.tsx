@@ -38,6 +38,7 @@ async function Familia() {
         pctInversion: doc.pctInversion,
         pctGasto: doc.pctGasto,
         pctDonaciones: doc.pctDonaciones,
+        interestPercent: typeof doc.interestPercent === "number" ? doc.interestPercent : 10,
       }
     : null;
   const childRows = childDocs.map((child) => ({

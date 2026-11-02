@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Target } from "lucide-react";
 import { Suspense } from "react";
 
 import { ChildShell } from "@/components/child-shell";
@@ -20,8 +21,12 @@ async function NuevoObjetivo() {
 
   return (
     <ChildShell>
-      <Link href="/yo/objetivos" className="text-sm font-bold text-accent">
-        ← Mis objetivos
+      <Link
+        href="/yo/objetivos"
+        className="inline-flex items-center gap-1.5 rounded-2xl border border-line bg-card px-3 py-2 text-sm font-bold shadow-sm"
+      >
+        <Target className="size-4 text-accent" aria-hidden />
+        Mis objetivos
       </Link>
       <div className="mx-auto mt-4 max-w-2xl">
         <GoalForm mode="create" />

@@ -16,8 +16,10 @@ export type Family = {
   pctInversion: number;
   pctGasto: number;
   pctDonaciones: number;
-  /** @deprecated Ya no se usa; los intereses los abona el banquero a mano. */
+  /** Tasa mensual de Inversión. `10` es 10 %. Se aplica como tasa/30 sobre el saldo diario. */
   interestPercent?: number;
+  /** Contador que sube con cada cambio visible entre adulto y niño. */
+  syncVersion?: number;
   timezone: "America/Santiago";
   currency: "CLP";
   createdAt: Date;
@@ -75,11 +77,13 @@ export type TipOccurrence = {
   reviewedAt: Date | null;
   reviewerId: ObjectId | null;
   reviewNote: string;
+  /** Nota del Mejorable anterior, visible al adulto cuando el niño reintenta. */
+  previousReviewNote?: string;
   newsReadAt?: Date | null;
   newsDismissedAt?: Date | null;
 };
 
-export type LedgerKind = "tip" | "transfer" | "withdrawal" | "interest" | "reversal";
+export type LedgerKind = "tip" | "transfer" | "withdrawal" | "deposit" | "interest" | "reversal";
 
 export type LedgerEntry = {
   _id: ObjectId;
@@ -110,6 +114,22 @@ export type WithdrawalRequest = {
   banqueroId: ObjectId | null;
 };
 
+export type DepositStatus = "pending" | "completed" | "cancelled";
+
+/** Plata externa que el niño aporta; el banquero confirma que la recibió. */
+export type DepositRequest = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  walletType: WalletType;
+  amountMinor: number;
+  note: string;
+  status: DepositStatus;
+  createdAt: Date;
+  completedAt: Date | null;
+  banqueroId: ObjectId | null;
+};
+
 export type TipDefinition = {
   _id: ObjectId;
   familyId: ObjectId;
@@ -123,6 +143,31 @@ export type TipDefinition = {
   hidden?: boolean;
   startsOn: string | null;
   createdAt: Date;
+};
+
+/** Abono de rentabilidad mensual (o parcial) por niño. */
+export type RentabilidadDaySnapshot = {
+  date: string;
+  balanceMinor: number;
+  interestMinor: number;
+};
+
+export type RentabilidadPago = {
+  _id: ObjectId;
+  familyId: ObjectId;
+  childId: ObjectId;
+  periodKey: string;
+  calculatedMinor: number;
+  discretionaryMinor: number;
+  paidMinor: number;
+  partial: boolean;
+  interestPercent: number;
+  daysIncluded: number;
+  /** Detalle diario congelado al abonar (auditable con la tasa usada). */
+  days?: RentabilidadDaySnapshot[];
+  operationId: string;
+  paidBy: ObjectId;
+  paidAt: Date;
 };
 
 export type GoalStatus = "active" | "achieved" | "discarded";
@@ -195,11 +240,15 @@ async function createIndexes() {
     db.collection("ledger_entries").createIndex({ operationId: 1, walletType: 1 }, { unique: true }),
     db.collection("withdrawal_requests").createIndex({ familyId: 1, status: 1, createdAt: -1 }),
     db.collection("withdrawal_requests").createIndex({ childId: 1, status: 1 }),
+    db.collection("deposit_requests").createIndex({ familyId: 1, status: 1, createdAt: -1 }),
+    db.collection("deposit_requests").createIndex({ childId: 1, status: 1 }),
     db.collection("child_goals").createIndex({ familyId: 1, childId: 1, status: 1, updatedAt: -1 }),
     db.collection("child_goals").createIndex(
       { childId: 1 },
       { unique: true, partialFilterExpression: { isFavorite: true, status: "active" } },
     ),
+    db.collection("rentabilidad_pagos").createIndex({ familyId: 1, childId: 1, periodKey: 1 }, { unique: true }),
+    db.collection("rentabilidad_pagos").createIndex({ familyId: 1, periodKey: 1 }),
   ]);
 }
 
@@ -253,7 +302,17 @@ export async function withdrawalRequests(): Promise<Collection<WithdrawalRequest
   return (await getDb()).collection<WithdrawalRequest>("withdrawal_requests");
 }
 
+export async function depositRequests(): Promise<Collection<DepositRequest>> {
+  await ensureIndexes();
+  return (await getDb()).collection<DepositRequest>("deposit_requests");
+}
+
 export async function childGoals(): Promise<Collection<ChildGoal>> {
   await ensureIndexes();
   return (await getDb()).collection<ChildGoal>("child_goals");
+}
+
+export async function rentabilidadPagos(): Promise<Collection<RentabilidadPago>> {
+  await ensureIndexes();
+  return (await getDb()).collection<RentabilidadPago>("rentabilidad_pagos");
 }
