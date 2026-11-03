@@ -23,15 +23,15 @@ const APORTAR_WALLETS: WalletType[] = ["gasto", "inversion"];
 const WALLET_META: Record<WalletType, { tone: string; icon: ReactNode }> = {
   gasto: {
     tone: "bg-[#ffe8ee] text-[#c2345a]",
-    icon: <ShoppingCart className="size-5" aria-hidden />,
+    icon: <ShoppingCart className="hucha-glyph size-5" aria-hidden />,
   },
   inversion: {
     tone: "bg-[#e5f8ec] text-[#0d7a45]",
-    icon: <TrendingUp className="size-5" aria-hidden />,
+    icon: <TrendingUp className="hucha-glyph size-5" aria-hidden />,
   },
   donaciones: {
     tone: "bg-[#fff4d6] text-[#a66b00]",
-    icon: <Heart className="size-5" aria-hidden />,
+    icon: <Heart className="hucha-glyph size-5" aria-hidden />,
   },
 };
 
@@ -249,27 +249,38 @@ export function ChildWallets({ initial }: { initial: WalletView[] }) {
           </button>
         </div>
       </div>
-      <div className="mt-3 grid flex-1 items-stretch gap-2.5 sm:grid-cols-3">
+      <div className="huchas-grid mt-3 grid flex-1 grid-cols-3 items-stretch gap-2 sm:gap-2.5">
         {ORDER.map((type) => {
           const wallet = byType.get(type) ?? { type, balanceMinor: 0, reservedMinor: 0, availableMinor: 0 };
           const meta = WALLET_META[type];
           return (
-            <article key={type} className={`relative flex h-full flex-col rounded-2xl p-3.5 ${meta.tone}`}>
+            <article
+              key={type}
+              aria-label={WALLET_LABELS[type]}
+              className={`relative flex h-full flex-col rounded-2xl p-2.5 sm:p-3.5 ${meta.tone}`}
+            >
               {busyLock ? <div className="absolute inset-0 z-10 rounded-2xl bg-white/50" aria-hidden /> : null}
-              <div className="flex items-center gap-1.5">
-                <div className="shrink-0 opacity-80">{meta.icon}</div>
-                <p className="text-[10px] font-bold uppercase leading-tight tracking-wide opacity-80">{WALLET_LABELS[type]}</p>
+              <div className="hucha-head flex min-w-0 items-center gap-1.5">
+                <div className="hucha-icon shrink-0 opacity-80">{meta.icon}</div>
+                <p
+                  title={WALLET_LABELS[type]}
+                  className="hucha-label min-w-0 truncate text-[10px] font-bold uppercase leading-tight tracking-wide opacity-80"
+                >
+                  {WALLET_LABELS[type]}
+                </p>
               </div>
-              <p className="mt-3 text-center text-2xl font-extrabold leading-none text-foreground">{pesos(wallet.availableMinor)}</p>
+              <p className="mt-2 text-center text-xl font-extrabold leading-none text-foreground sm:mt-3 sm:text-2xl">
+                {pesos(wallet.availableMinor)}
+              </p>
               {wallet.reservedMinor > 0 ? (
-                <p className="mt-2 text-center text-xs font-bold">Pediste {pesos(wallet.reservedMinor)}</p>
+                <p className="mt-2 text-center text-[11px] font-bold sm:text-xs">Pediste {pesos(wallet.reservedMinor)}</p>
               ) : null}
-              <div className="mt-auto pt-5">
+              <div className="mt-auto pt-3 sm:pt-5">
                 <button
                   type="button"
                   disabled={busyLock || wallet.availableMinor <= 0}
                   onClick={() => openRetirar(type)}
-                  className="w-full rounded-xl border border-foreground/15 bg-white/70 px-2 py-2.5 text-sm font-bold disabled:opacity-40"
+                  className="w-full rounded-xl border border-foreground/15 bg-white/70 px-1.5 py-2 text-xs font-bold sm:px-2 sm:py-2.5 sm:text-sm disabled:opacity-40"
                 >
                   Retirar
                 </button>

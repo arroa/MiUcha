@@ -77,6 +77,14 @@ body {
   }
 }
 
+/* PWA instalada: ícono de hucha un poco más grande. */
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  .yo-soft .hucha-glyph {
+    width: 1.75rem;
+    height: 1.75rem;
+  }
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .tip-celebrate {
     animation: tip-celebrate 0.85s ease both;
